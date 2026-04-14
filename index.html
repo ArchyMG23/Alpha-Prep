@@ -17,7 +17,59 @@
     <link rel="manifest" href="/manifest.json" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Initial Loading Screen (CSS Only) -->
+      <style>
+        .initial-loader {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background-color: #f8fafc;
+          z-index: 9999;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .loader-logo {
+          width: 80px;
+          height: 80px;
+          background-color: #4f46e5;
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 48px;
+          font-weight: bold;
+          margin-bottom: 24px;
+          box-shadow: 0 20px 25px -5px rgb(79 70 229 / 0.2);
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .loader-text {
+          font-weight: 900;
+          color: #0f172a;
+          font-size: 24px;
+          letter-spacing: -0.025em;
+        }
+        .loader-spinner {
+          margin-top: 16px;
+          width: 24px;
+          height: 24px;
+          border: 3px solid #e2e8f0;
+          border-top-color: #4f46e5;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(0.95); } }
+      </style>
+      <div class="initial-loader">
+        <div class="loader-logo">α</div>
+        <div class="loader-text">Alpha Prep</div>
+        <div class="loader-spinner"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

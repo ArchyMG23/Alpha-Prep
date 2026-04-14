@@ -1,17 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Question, TaskType, Level, TestType, PlanPrice } from '../types';
-import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, Settings, Lock, ShieldCheck, Save, MessageSquare } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, Settings, Lock, ShieldCheck, Save, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { parseExamDocument } from '../services/geminiService';
 
 export default function AdminCMS() {
   const { questions, setQuestions, prices, setPrices, generateAccessKey, accessKeys } = useAppContext();
   const [isAdding, setIsAdding] = useState(false);
   const [isManagingPrices, setIsManagingPrices] = useState(false);
   const [isGeneratingKeys, setIsGeneratingKeys] = useState(false);
+  const [keyType, setKeyType] = useState<'SUBSCRIPTION' | 'CREDITS'>('SUBSCRIPTION');
   const [adminCode, setAdminCode] = useState('');
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [detectedQuestions, setDetectedQuestions] = useState<Partial<Question>[]>([]);
   
   const [newQ, setNewQ] = useState<Partial<Question>>({
     testType: 'TCF',
@@ -51,31 +54,59 @@ export default function AdminCMS() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    // Simulate AI conversion of file to exam format
-    setTimeout(() => {
-      const fileName = file.name;
-      const extension = fileName.split('.').pop()?.toLowerCase();
-      
-      let type: TaskType = 'READING';
-      if (['mp3', 'wav', 'm4a'].includes(extension || '')) type = 'LISTENING';
-      if (['mp4', 'mov'].includes(extension || '')) type = 'LISTENING';
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      try {
+        const result = event.target?.result as string;
+        const detected = await parseExamDocument(result, file.type, file.name);
+        
+        if (detected && detected.length > 0) {
+          setDetectedQuestions(detected.map(q => ({ ...q, sourceFile: file.name })));
+          setSuccessMsg(`${detected.length} exercices détectés et classés par l'IA !`);
+        } else {
+          alert("Aucun exercice n'a pu être extrait automatiquement de ce document.");
+        }
+      } catch (error) {
+        console.error("Upload Error:", error);
+        alert("Erreur lors de l'analyse du document.");
+      } finally {
+        setIsUploading(false);
+        setTimeout(() => setSuccessMsg(''), 3000);
+      }
+    };
 
-      setNewQ({
-        ...newQ,
-        title: `Exercice importé : ${fileName}`,
-        content: `[Contenu extrait du fichier ${fileName}]\n\nConsigne : Analysez le document et répondez aux questions suivantes...`,
-        type,
-        sourceFile: fileName
-      });
-      setIsUploading(false);
-      setSuccessMsg(`Fichier ${fileName} converti avec succès !`);
-      setTimeout(() => setSuccessMsg(''), 3000);
-    }, 2000);
+    if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleConfirmDetected = () => {
+    const newQuestions: Question[] = detectedQuestions.map((dq, index) => ({
+      id: `q_${Date.now()}_${index}`,
+      testType: dq.testType as TestType,
+      type: dq.type as TaskType,
+      level: dq.level as Level,
+      title: dq.title || 'Sans titre',
+      content: dq.content || '',
+      isPremium: dq.isPremium || false,
+      isFullAccessOnly: dq.isFullAccessOnly || false,
+      requiredCredits: dq.requiredCredits || 0,
+      sourceFile: dq.sourceFile
+    }));
+
+    setQuestions([...newQuestions, ...questions]);
+    setDetectedQuestions([]);
+    setIsAdding(false);
+    setSuccessMsg(`${newQuestions.length} exercices ajoutés au CMS avec succès !`);
+    setTimeout(() => setSuccessMsg(''), 3000);
   };
 
   const handleSaveQuestion = () => {
@@ -176,30 +207,63 @@ export default function AdminCMS() {
       {/* Key Generation */}
       {isGeneratingKeys && (
         <div className="mx-4 md:mx-0 bg-indigo-900 p-6 md:p-8 rounded-3xl text-white shadow-xl animate-in zoom-in-95">
-          <h2 className="text-lg md:text-xl font-black mb-6 flex items-center gap-2"><Key size={20} /> Générateur de Clés d'Accès</h2>
+          <h2 className="text-lg md:text-xl font-black mb-6 flex items-center gap-2"><Key size={20} /> Générateur de Clés</h2>
+          
+          <div className="flex gap-4 mb-6">
+            <button 
+              onClick={() => setKeyType('SUBSCRIPTION')}
+              className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${keyType === 'SUBSCRIPTION' ? 'bg-white text-indigo-900' : 'bg-indigo-800 text-indigo-300'}`}
+            >
+              Abonnement
+            </button>
+            <button 
+              onClick={() => setKeyType('CREDITS')}
+              className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${keyType === 'CREDITS' ? 'bg-white text-indigo-900' : 'bg-indigo-800 text-indigo-300'}`}
+            >
+              Crédits IA
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <select id="keyTest" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm">
-              <option value="TCF">TCF</option>
-              <option value="TEF">TEF</option>
-              <option value="IELTS">IELTS</option>
-            </select>
-            <select id="keyDays" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm">
-              <option value="10">10 Jours</option>
-              <option value="15">15 Jours</option>
-              <option value="30">30 Jours</option>
-              <option value="60">60 Jours</option>
-            </select>
-            <select id="keyLevel" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm">
-              <option value="BASIC">BASIC</option>
-              <option value="FULL">FULL</option>
-            </select>
+            {keyType === 'SUBSCRIPTION' ? (
+              <>
+                <select id="keyTest" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm">
+                  <option value="TCF">TCF</option>
+                  <option value="TEF">TEF</option>
+                  <option value="IELTS">IELTS</option>
+                </select>
+                <select id="keyDays" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm">
+                  <option value="10">10 Jours</option>
+                  <option value="15">15 Jours</option>
+                  <option value="30">30 Jours</option>
+                  <option value="60">60 Jours</option>
+                </select>
+                <select id="keyLevel" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm">
+                  <option value="BASIC">BASIC</option>
+                  <option value="FULL">FULL</option>
+                </select>
+              </>
+            ) : (
+              <select id="keyCredits" className="p-3 md:p-4 bg-indigo-800 border border-indigo-700 rounded-2xl font-bold outline-none text-sm sm:col-span-3">
+                <option value="5">5 Crédits</option>
+                <option value="10">10 Crédits</option>
+                <option value="20">20 Crédits</option>
+                <option value="50">50 Crédits</option>
+              </select>
+            )}
             <button 
               onClick={() => {
-                const t = (document.getElementById('keyTest') as HTMLSelectElement).value as TestType;
-                const d = parseInt((document.getElementById('keyDays') as HTMLSelectElement).value);
-                const l = (document.getElementById('keyLevel') as HTMLSelectElement).value as 'BASIC' | 'FULL';
-                const key = generateAccessKey(t, d, l);
-                setSuccessMsg(`Clé générée : ${key}`);
+                if (keyType === 'SUBSCRIPTION') {
+                  const t = (document.getElementById('keyTest') as HTMLSelectElement).value as TestType;
+                  const d = parseInt((document.getElementById('keyDays') as HTMLSelectElement).value);
+                  const l = (document.getElementById('keyLevel') as HTMLSelectElement).value as 'BASIC' | 'FULL';
+                  const key = generateAccessKey({ type: 'SUBSCRIPTION', test: t, days: d, level: l });
+                  setSuccessMsg(`Clé Abonnement générée : ${key}`);
+                } else {
+                  const c = parseInt((document.getElementById('keyCredits') as HTMLSelectElement).value);
+                  const key = generateAccessKey({ type: 'CREDITS', credits: c });
+                  setSuccessMsg(`Clé Crédits générée : ${key}`);
+                }
               }}
               className="p-3 md:p-4 bg-white text-indigo-900 font-black rounded-2xl hover:bg-indigo-50 transition-all text-sm"
             >
@@ -209,8 +273,15 @@ export default function AdminCMS() {
           <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
             {accessKeys.slice().reverse().map((k, i) => (
               <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-indigo-800/50 rounded-xl border border-indigo-700 gap-2">
-                <span className="font-mono font-black text-indigo-200 text-sm">{k.key}</span>
-                <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest">{k.testType} - {k.durationDays}j - {k.accessLevel}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-black text-indigo-200 text-sm">{k.key}</span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-indigo-700 text-indigo-300 uppercase">
+                    {k.type === 'SUBSCRIPTION' ? 'ABO' : 'CRÉDITS'}
+                  </span>
+                </div>
+                <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest">
+                  {k.type === 'SUBSCRIPTION' ? `${k.testType} - ${k.durationDays}j - ${k.accessLevel}` : `${k.creditAmount} Crédits`}
+                </span>
                 <span className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-full w-fit ${k.isUsed ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
                   {k.isUsed ? 'UTILISÉE' : 'VALIDE'}
                 </span>
@@ -235,15 +306,51 @@ export default function AdminCMS() {
               {isUploading ? <Loader2 className="animate-spin" /> : <Upload size={28} />}
             </div>
             <h3 className="font-black text-slate-900 mb-1 text-sm md:text-base">Importation Intelligente IA</h3>
-            <p className="text-xs text-slate-500 mb-6 max-w-xs">Déposez un PDF, Audio ou Vidéo. Notre IA le convertira automatiquement en exercice conforme à l'examen.</p>
+            <p className="text-xs text-slate-500 mb-6 max-w-xs">Déposez un document complet (PDF, Audio, Texte). L'IA va extraire, trier et classer chaque module automatiquement.</p>
             <button 
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
               className="px-5 py-2.5 md:px-6 md:py-3 bg-white border border-slate-200 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
             >
-              {isUploading ? 'Conversion en cours...' : 'Sélectionner un fichier'}
+              {isUploading ? 'Analyse IA en cours...' : 'Sélectionner un document'}
             </button>
           </div>
+
+          {/* Detected Questions Review */}
+          {detectedQuestions.length > 0 && (
+            <div className="mb-8 md:mb-10 animate-in slide-in-from-bottom-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-black text-slate-900 flex items-center gap-2">
+                  <CheckCircle2 className="text-emerald-500" size={20} /> Exercices détectés ({detectedQuestions.length})
+                </h3>
+                <button onClick={() => setDetectedQuestions([])} className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Effacer tout</button>
+              </div>
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                {detectedQuestions.map((dq, i) => (
+                  <div key={i} className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[8px] font-black">{dq.testType}</span>
+                        <span className="text-[10px] font-black text-emerald-700 uppercase">{dq.type}</span>
+                        <span className="text-[10px] font-bold text-emerald-500">• {dq.level}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm truncate">{dq.title}</h4>
+                    </div>
+                    <button onClick={() => setDetectedQuestions(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
+                  </div>
+                ))}
+              </div>
+              <button 
+                onClick={handleConfirmDetected}
+                className="w-full mt-4 py-4 bg-emerald-600 text-white font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2"
+              >
+                <Plus size={20} /> Ajouter ces {detectedQuestions.length} exercices au CMS
+              </button>
+              <div className="mt-6 border-t border-slate-100 pt-6">
+                <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Ou continuer manuellement ci-dessous</p>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8 mb-6 md:mb-8">
             <div className="space-y-2">

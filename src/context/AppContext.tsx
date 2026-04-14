@@ -14,8 +14,14 @@ interface AppState {
   deductCredit: (amount: number) => boolean;
   addCredits: (amount: number) => void;
   addSubscription: (sub: Subscription) => void;
-  generateAccessKey: (test: TestType, days: number, level: 'BASIC' | 'FULL') => string;
-  useAccessKey: (key: string) => boolean;
+  generateAccessKey: (params: {
+    type: 'SUBSCRIPTION' | 'CREDITS';
+    test?: TestType;
+    days?: number;
+    level?: 'BASIC' | 'FULL';
+    credits?: number;
+  }) => string;
+  useAccessKey: (key: string) => { success: boolean; message: string };
 }
 
 const initialPrices: PlanPrice[] = [
@@ -162,7 +168,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const generateAccessKey = (test: TestType, days: number, level: 'BASIC' | 'FULL') => {
+  const generateAccessKey = (params: {
+    type: 'SUBSCRIPTION' | 'CREDITS';
+    test?: TestType;
+    days?: number;
+    level?: 'BASIC' | 'FULL';
+    credits?: number;
+  }) => {
     const key = Math.random().toString(36).substring(2, 10).toUpperCase();
     const now = new Date();
     const expiresIfUnusedAt = new Date();
@@ -170,9 +182,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setAccessKeys(prev => [...prev, { 
       key, 
-      testType: test, 
-      durationDays: days, 
-      accessLevel: level, 
+      type: params.type,
+      testType: params.test, 
+      durationDays: params.days, 
+      accessLevel: params.level, 
+      creditAmount: params.credits,
       isUsed: false,
       createdAt: now.toISOString(),
       expiresIfUnusedAt: expiresIfUnusedAt.toISOString()
@@ -186,18 +200,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       !k.isUsed && 
       new Date(k.expiresIfUnusedAt) > new Date()
     );
+
     if (found) {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + found.durationDays);
-      addSubscription({
-        testType: found.testType,
-        expiresAt: expiresAt.toISOString(),
-        accessLevel: found.accessLevel
-      });
-      setAccessKeys(prev => prev.map(k => k.key === key ? { ...k, isUsed: true } : k));
-      return true;
+      if (found.type === 'SUBSCRIPTION' && found.testType && found.durationDays && found.accessLevel) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + found.durationDays);
+        addSubscription({
+          testType: found.testType,
+          expiresAt: expiresAt.toISOString(),
+          accessLevel: found.accessLevel
+        });
+        setAccessKeys(prev => prev.map(k => k.key === key ? { ...k, isUsed: true } : k));
+        return { success: true, message: `Abonnement ${found.testType} activé pour ${found.durationDays} jours !` };
+      } else if (found.type === 'CREDITS' && found.creditAmount) {
+        addCredits(found.creditAmount);
+        setAccessKeys(prev => prev.map(k => k.key === key ? { ...k, isUsed: true } : k));
+        return { success: true, message: `${found.creditAmount} crédits IA ajoutés à votre compte !` };
+      }
     }
-    return false;
+    return { success: false, message: "Clé invalide, déjà utilisée ou expirée." };
   };
 
   return (

@@ -12,12 +12,12 @@ export default function Store() {
   const filteredPrices = prices.filter(p => p.testType === selectedTest);
 
   const handleActivateKey = () => {
-    const success = useAccessKey(accessKeyInput.trim().toUpperCase());
-    if (success) {
-      setKeyStatus({ type: 'success', msg: 'Accès activé avec succès !' });
+    const result = useAccessKey(accessKeyInput.trim().toUpperCase());
+    if (result.success) {
+      setKeyStatus({ type: 'success', msg: result.message });
       setAccessKeyInput('');
     } else {
-      setKeyStatus({ type: 'error', msg: 'Clé invalide ou déjà utilisée.' });
+      setKeyStatus({ type: 'error', msg: result.message });
     }
     setTimeout(() => setKeyStatus(null), 5000);
   };

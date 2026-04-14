@@ -13,9 +13,11 @@ export interface PlanPrice {
 
 export interface AccessKey {
   key: string;
-  testType: TestType;
-  durationDays: number;
-  accessLevel: 'BASIC' | 'FULL';
+  type: 'SUBSCRIPTION' | 'CREDITS';
+  testType?: TestType;
+  durationDays?: number;
+  accessLevel?: 'BASIC' | 'FULL';
+  creditAmount?: number;
   isUsed: boolean;
   createdAt: string;
   expiresIfUnusedAt: string;
