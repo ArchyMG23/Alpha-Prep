@@ -229,18 +229,18 @@ export default function ExamMode() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 md:px-0">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Simulations d'Examen</h1>
-          <p className="text-slate-500 mt-2 text-lg font-medium">Pratiquez en conditions réelles avec correction instantanée.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Simulations d'Examen</h1>
+          <p className="text-slate-500 mt-2 text-base md:text-lg font-medium">Pratiquez en conditions réelles avec correction instantanée.</p>
         </div>
-        <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm w-fit">
           {(['TCF', 'TEF', 'IELTS'] as TestType[]).map(test => (
             <button
               key={test}
               onClick={() => setSelectedTest(test)}
-              className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
+              className={`px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-xs md:text-sm font-black transition-all ${
                 selectedTest === test ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
@@ -251,13 +251,13 @@ export default function ExamMode() {
       </div>
 
       {error && (
-        <div className="bg-rose-50 text-rose-700 p-6 rounded-2xl flex items-center gap-4 border border-rose-100 animate-in shake duration-500">
-          <AlertCircle size={28} className="shrink-0" />
-          <p className="font-black">{error}</p>
+        <div className="mx-4 md:mx-0 bg-rose-50 text-rose-700 p-4 md:p-6 rounded-2xl flex items-center gap-4 border border-rose-100 animate-in shake duration-500">
+          <AlertCircle size={24} className="shrink-0" />
+          <p className="font-black text-sm md:text-base">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8 px-4 md:px-0">
         {filteredQuestions.map(q => {
           const isSubscribed = hasSubscription(q.testType);
           const accessLevel = getAccessLevel(q.testType);
@@ -267,7 +267,7 @@ export default function ExamMode() {
           return (
             <div 
               key={q.id} 
-              className={`bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all flex flex-col group relative overflow-hidden ${isLocked ? 'opacity-75' : ''}`}
+              className={`bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all flex flex-col group relative overflow-hidden ${isLocked ? 'opacity-75' : ''}`}
             >
               {isLocked && (
                 <div className="absolute inset-0 bg-slate-900/5 backdrop-blur-[1px] flex items-center justify-center z-10">
@@ -277,7 +277,7 @@ export default function ExamMode() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
                 <div className={`p-3 rounded-2xl ${
                   q.type === 'WRITING' ? 'bg-indigo-50 text-indigo-600' : 
                   q.type === 'READING' ? 'bg-emerald-50 text-emerald-600' : 
@@ -290,23 +290,23 @@ export default function ExamMode() {
                 <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Niveau {q.level}</span>
               </div>
 
-              <h3 className="text-xl font-black text-slate-900 mb-2 tracking-tight group-hover:text-indigo-600 transition-colors">{q.title}</h3>
-              <p className="text-slate-500 text-sm line-clamp-2 mb-8 font-medium">{q.content}</p>
+              <h3 className="text-lg md:text-xl font-black text-slate-900 mb-2 tracking-tight group-hover:text-indigo-600 transition-colors">{q.title}</h3>
+              <p className="text-slate-500 text-xs md:text-sm line-clamp-2 mb-6 md:mb-8 font-medium">{q.content}</p>
               
               <div className="mt-auto pt-6 border-t border-slate-100 flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     {q.requiredCredits > 0 ? `${q.requiredCredits} Crédit` : 'Gratuit'}
                   </span>
                   {q.type === 'WRITING' && (
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${attemptCount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest ${attemptCount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                       {attemptCount > 0 ? 'Essai utilisé' : '1 Essai disponible'}
                     </span>
                   )}
                 </div>
                 <button 
                   onClick={() => startExam(q)}
-                  className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition-all uppercase tracking-widest"
+                  className="px-4 py-2 md:px-6 md:py-3 bg-slate-900 hover:bg-slate-800 text-white text-[10px] md:text-xs font-black rounded-xl transition-all uppercase tracking-widest"
                 >
                   {q.type === 'METHODOLOGY' ? 'Consulter' : 'Démarrer'}
                 </button>
