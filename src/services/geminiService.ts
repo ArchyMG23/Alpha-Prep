@@ -1,9 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, TestType, TaskType, Level } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is not defined. AI features will be disabled.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
+  }
+  return aiInstance;
+}
 
 export async function parseExamDocument(fileData: string, mimeType: string, fileName: string): Promise<Partial<Question>[]> {
+  const ai = getAI();
   const isText = mimeType.startsWith('text/') || fileName.endsWith('.txt') || fileName.endsWith('.md');
   
   const prompt = `Analyze the provided document "${fileName}". 
