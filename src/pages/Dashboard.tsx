@@ -16,11 +16,19 @@ export default function Dashboard({ navigateTo }: { navigateTo: (tab: string) =>
         </div>
         <div className="flex flex-wrap gap-2 md:gap-3">
           {activeSubs.length > 0 ? (
-            activeSubs.map(sub => (
-              <span key={sub.testType} className="px-3 py-1.5 md:px-4 md:py-2 bg-indigo-600 text-white rounded-full text-[9px] md:text-[10px] font-black tracking-widest uppercase shadow-lg shadow-indigo-200 flex items-center gap-2">
-                <ShieldCheck size={14} /> {sub.testType} ({sub.accessLevel})
-              </span>
-            ))
+            activeSubs.map(sub => {
+              const daysLeft = Math.ceil((new Date(sub.expiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              return (
+                <div key={sub.testType} className="flex flex-col items-end gap-1">
+                  <span className="px-3 py-1.5 md:px-4 md:py-2 bg-indigo-600 text-white rounded-full text-[9px] md:text-[10px] font-black tracking-widest uppercase shadow-lg shadow-indigo-200 flex items-center gap-2">
+                    <ShieldCheck size={14} /> {sub.testType} ({sub.accessLevel})
+                  </span>
+                  <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                    Expire dans {daysLeft} jour{daysLeft > 1 ? 's' : ''}
+                  </span>
+                </div>
+              );
+            })
           ) : (
             <span className="px-4 py-2 bg-slate-200 text-slate-600 rounded-full text-[10px] font-black tracking-widest uppercase">
               Aucun accès actif
@@ -68,7 +76,14 @@ export default function Dashboard({ navigateTo }: { navigateTo: (tab: string) =>
               <div className="p-3 bg-indigo-800 rounded-2xl"><Award size={28} /></div>
               <h3 className="font-bold text-lg">Crédits IA</h3>
             </div>
-            <span className="text-4xl md:text-5xl font-black text-white tracking-tighter">{user.correctionCredits}</span>
+            <div className="flex flex-col">
+              <span className="text-4xl md:text-5xl font-black text-white tracking-tighter">{user.correctionCredits}</span>
+              {user.creditsExpireAt && (
+                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mt-2">
+                  Expire le {new Date(user.creditsExpireAt).toLocaleDateString('fr-FR')}
+                </span>
+              )}
+            </div>
           </div>
           <button 
             onClick={() => navigateTo('store')}

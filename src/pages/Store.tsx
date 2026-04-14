@@ -40,6 +40,7 @@ export default function Store() {
         <h2 className="text-xl font-black mb-4 flex items-center gap-3">
           <Key className="text-indigo-300" /> Activer une clé d'accès
         </h2>
+        <p className="text-indigo-300 text-xs mb-4 font-medium italic">Note : Les clés générées sont valables 7 jours avant activation.</p>
         <div className="flex flex-col sm:flex-row gap-4">
           <input 
             type="text" 
@@ -111,7 +112,7 @@ export default function Store() {
             <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-3">
               <Zap className="text-indigo-500" fill="currentColor" /> Crédits IA High-Precision
             </h2>
-            <p className="text-slate-500 mt-1 font-medium text-sm md:text-base">Corrections chirurgicales valables pour TOUS les tests.</p>
+            <p className="text-slate-500 mt-1 font-medium text-sm md:text-base">Corrections chirurgicales valables 30 jours pour TOUS les tests.</p>
           </div>
           <div className="flex items-center gap-3 text-xs md:text-sm font-black text-indigo-600 bg-indigo-50 px-5 py-2.5 rounded-full border border-indigo-100 w-fit">
             <CreditCard size={18} /> Solde : {user.correctionCredits} crédits

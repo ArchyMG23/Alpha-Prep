@@ -21,7 +21,7 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-[100dvh] bg-slate-50 text-slate-900 font-sans overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-slate-200">
@@ -92,7 +92,7 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-50 flex items-center justify-between px-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-50 flex items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-2">
             &alpha;
@@ -110,7 +110,7 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 bg-slate-900/50 z-40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="absolute top-16 left-0 right-0 bg-white border-b border-slate-200 p-4 animate-in slide-in-from-top duration-200" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-16 left-0 right-0 bg-white border-b border-slate-200 p-4 pt-[calc(1rem+env(safe-area-inset-top))] animate-in slide-in-from-top duration-200" onClick={e => e.stopPropagation()}>
             <nav className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -137,13 +137,13 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto bg-slate-50/50 pt-16 lg:pt-0 pb-20 lg:pb-0">
-        <div className="max-w-5xl mx-auto p-4 md:p-8">
+        <div className="max-w-5xl mx-auto p-4 md:p-8 pt-[calc(1rem+env(safe-area-inset-top))]">
           {children}
         </div>
       </main>
 
       {/* Mobile Bottom Nav (Quick Access) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 h-16 flex items-center justify-around px-2 z-50">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 h-16 pb-[env(safe-area-inset-bottom)] flex items-center justify-around px-2 z-50">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

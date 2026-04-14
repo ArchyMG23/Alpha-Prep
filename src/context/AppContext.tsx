@@ -12,6 +12,7 @@ interface AppState {
   setPrices: React.Dispatch<React.SetStateAction<PlanPrice[]>>;
   addAttempt: (attempt: Attempt) => void;
   deductCredit: (amount: number) => boolean;
+  addCredits: (amount: number) => void;
   addSubscription: (sub: Subscription) => void;
   generateAccessKey: (test: TestType, days: number, level: 'BASIC' | 'FULL') => string;
   useAccessKey: (key: string) => boolean;
@@ -120,10 +121,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deductCredit = (amount: number) => {
     if (user.correctionCredits >= amount) {
+      // Check if credits are expired
+      if (user.creditsExpireAt && new Date(user.creditsExpireAt) < new Date()) {
+        setUser(prev => ({ ...prev, correctionCredits: 0, creditsExpireAt: undefined }));
+        return false;
+      }
       setUser(prev => ({ ...prev, correctionCredits: prev.correctionCredits - amount }));
       return true;
     }
     return false;
+  };
+
+  const addCredits = (amount: number) => {
+    setUser(prev => {
+      const now = new Date();
+      const expiresAt = new Date();
+      expiresAt.setDate(now.getDate() + 30); // Credits expire in 30 days
+      
+      return {
+        ...prev,
+        correctionCredits: prev.correctionCredits + amount,
+        creditsExpireAt: expiresAt.toISOString()
+      };
+    });
   };
 
   const addSubscription = (sub: Subscription) => {
@@ -144,12 +164,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const generateAccessKey = (test: TestType, days: number, level: 'BASIC' | 'FULL') => {
     const key = Math.random().toString(36).substring(2, 10).toUpperCase();
-    setAccessKeys(prev => [...prev, { key, testType: test, durationDays: days, accessLevel: level, isUsed: false }]);
+    const now = new Date();
+    const expiresIfUnusedAt = new Date();
+    expiresIfUnusedAt.setDate(now.getDate() + 7); // Key expires in 7 days if not used
+
+    setAccessKeys(prev => [...prev, { 
+      key, 
+      testType: test, 
+      durationDays: days, 
+      accessLevel: level, 
+      isUsed: false,
+      createdAt: now.toISOString(),
+      expiresIfUnusedAt: expiresIfUnusedAt.toISOString()
+    }]);
     return key;
   };
 
   const useAccessKey = (key: string) => {
-    const found = accessKeys.find(k => k.key === key && !k.isUsed);
+    const found = accessKeys.find(k => 
+      k.key === key && 
+      !k.isUsed && 
+      new Date(k.expiresIfUnusedAt) > new Date()
+    );
     if (found) {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + found.durationDays);
@@ -176,6 +212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPrices,
       addAttempt, 
       deductCredit,
+      addCredits,
       addSubscription,
       generateAccessKey,
       useAccessKey

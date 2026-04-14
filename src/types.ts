@@ -17,6 +17,8 @@ export interface AccessKey {
   durationDays: number;
   accessLevel: 'BASIC' | 'FULL';
   isUsed: boolean;
+  createdAt: string;
+  expiresIfUnusedAt: string;
 }
 
 export interface Subscription {
@@ -32,6 +34,7 @@ export interface User {
   role: UserRole;
   subscriptions: Subscription[];
   correctionCredits: number;
+  creditsExpireAt?: string;
   estimatedCRS: number;
   averageCLB: number;
 }
