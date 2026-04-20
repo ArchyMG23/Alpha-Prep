@@ -5,6 +5,8 @@ import { Target, TrendingUp, Award, Clock, ArrowRight, PenTool, Globe, ShieldChe
 export default function Dashboard({ navigateTo }: { navigateTo: (tab: string) => void }) {
   const { user, attempts } = useAppContext();
 
+  if (!user) return null;
+
   const activeSubs = user.subscriptions.filter(s => new Date(s.expiresAt) > new Date());
 
   return (

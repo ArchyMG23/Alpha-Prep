@@ -9,10 +9,12 @@ export default function Store() {
   const [accessKeyInput, setAccessKeyInput] = useState('');
   const [keyStatus, setKeyStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
+  if (!user) return null;
+
   const filteredPrices = prices.filter(p => p.testType === selectedTest);
 
-  const handleActivateKey = () => {
-    const result = useAccessKey(accessKeyInput.trim().toUpperCase());
+  const handleActivateKey = async () => {
+    const result = await useAccessKey(accessKeyInput.trim().toUpperCase());
     if (result.success) {
       setKeyStatus({ type: 'success', msg: result.message });
       setAccessKeyInput('');

@@ -1,27 +1,44 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Question, Attempt, TestType, Subscription, PlanPrice, AccessKey } from '../types';
+import { auth, db, handleFirestoreError } from '../lib/firebase';
+import { 
+  onSnapshot, 
+  collection, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  query, 
+  where,
+  serverTimestamp,
+  runTransaction
+} from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AppState {
-  user: User;
+  user: User | null;
   questions: Question[];
   attempts: Attempt[];
   prices: PlanPrice[];
   accessKeys: AccessKey[];
-  setUser: React.Dispatch<React.SetStateAction<User>>;
+  isLoading: boolean;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setQuestions: React.Dispatch<React.SetStateAction<Question[]>>;
   setPrices: React.Dispatch<React.SetStateAction<PlanPrice[]>>;
-  addAttempt: (attempt: Attempt) => void;
-  deductCredit: (amount: number) => boolean;
-  addCredits: (amount: number) => void;
-  addSubscription: (sub: Subscription) => void;
+  addAttempt: (attempt: Attempt) => Promise<void>;
+  deductCredit: (amount: number) => Promise<boolean>;
+  addCredits: (amount: number) => Promise<void>;
+  addSubscription: (sub: Subscription) => Promise<void>;
+  saveQuestion: (question: Question) => Promise<void>;
+  deleteQuestion: (id: string) => Promise<void>;
   generateAccessKey: (params: {
     type: 'SUBSCRIPTION' | 'CREDITS';
     test?: TestType;
     days?: number;
     level?: 'BASIC' | 'FULL';
     credits?: number;
-  }) => string;
-  useAccessKey: (key: string) => { success: boolean; message: string };
+  }) => Promise<string>;
+  useAccessKey: (key: string) => Promise<{ success: boolean; message: string }>;
 }
 
 const initialPrices: PlanPrice[] = [
@@ -33,142 +50,179 @@ const initialPrices: PlanPrice[] = [
   { id: 'p6', testType: 'IELTS', durationDays: 30, priceXAF: 30000, accessLevel: 'FULL' },
 ];
 
-const initialUser: User = {
-  id: 'u1',
-  name: 'Alexandre Dupont',
-  email: 'alex@example.com',
-  role: 'ADMIN',
-  subscriptions: [],
-  correctionCredits: 0,
-  estimatedCRS: 420,
-  averageCLB: 6.5,
-};
-
-const initialQuestions: Question[] = [
-  // TCF Canada
-  {
-    id: 'tcf-w1',
-    testType: 'TCF',
-    type: 'WRITING',
-    level: 'B2',
-    title: 'Expression Écrite - Tâche 1',
-    content: 'Vous avez assisté à un événement culturel original. Rédigez un court article pour un journal local pour raconter cet événement et donner vos impressions. (80 à 120 mots)',
-    isPremium: false,
-    isFullAccessOnly: false,
-    requiredCredits: 1,
-  },
-  {
-    id: 'tcf-m1',
-    testType: 'TCF',
-    type: 'METHODOLOGY',
-    level: 'B2',
-    title: 'Méthodologie - Expression Écrite',
-    content: 'Apprenez à structurer votre texte pour la tâche 1 du TCF.',
-    isPremium: true,
-    isFullAccessOnly: true,
-    requiredCredits: 0,
-    methodologyContent: 'La structure idéale : 1. Introduction, 2. Développement, 3. Conclusion...',
-  },
-  {
-    id: 'tcf-m2',
-    testType: 'TCF',
-    type: 'METHODOLOGY',
-    level: 'B2',
-    title: 'Méthodologie - Compréhension Écrite',
-    content: 'Stratégies pour le repérage d\'informations clés.',
-    isPremium: true,
-    isFullAccessOnly: true,
-    requiredCredits: 0,
-    methodologyContent: 'Lisez d\'abord les questions avant le texte pour savoir quoi chercher...',
-  },
-  {
-    id: 'tcf-m3',
-    testType: 'TCF',
-    type: 'METHODOLOGY',
-    level: 'B2',
-    title: 'Méthodologie - Compréhension Orale',
-    content: 'Comment gérer le temps et les distractions sonores.',
-    isPremium: true,
-    isFullAccessOnly: true,
-    requiredCredits: 0,
-    methodologyContent: 'Concentrez-vous sur les mots-clés et les connecteurs logiques...',
-  },
-  {
-    id: 'tcf-m4',
-    testType: 'TCF',
-    type: 'METHODOLOGY',
-    level: 'B2',
-    title: 'Méthodologie - Expression Orale',
-    content: 'Techniques pour parler avec fluidité et assurance.',
-    isPremium: true,
-    isFullAccessOnly: true,
-    requiredCredits: 0,
-    methodologyContent: 'Utilisez des expressions de transition pour gagner du temps de réflexion...',
-  }
-];
-
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>(initialUser);
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [user, setUser] = useState<User | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [prices, setPrices] = useState<PlanPrice[]>(initialPrices);
   const [accessKeys, setAccessKeys] = useState<AccessKey[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const addAttempt = (attempt: Attempt) => {
-    setAttempts(prev => [attempt, ...prev]);
-    setUser(prev => ({
-      ...prev,
-      averageCLB: Math.min(10, prev.averageCLB + 0.1),
-      estimatedCRS: Math.min(600, prev.estimatedCRS + 5)
-    }));
-  };
+  // 1. Auth & User Profile Management
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        // Sync user profile from Firestore
+        const userRef = doc(db, 'users', fbUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          setUser(userSnap.data() as User);
+        } else {
+          // Create initial profile
+          const newUser: User = {
+            id: fbUser.uid,
+            name: fbUser.displayName || 'Étudiant',
+            email: fbUser.email || '',
+            role: 'USER',
+            subscriptions: [],
+            correctionCredits: 0,
+            estimatedCRS: 0,
+            averageCLB: 0
+          };
+          await setDoc(userRef, newUser);
+          setUser(newUser);
+        }
 
-  const deductCredit = (amount: number) => {
-    if (user.correctionCredits >= amount) {
-      // Check if credits are expired
-      if (user.creditsExpireAt && new Date(user.creditsExpireAt) < new Date()) {
-        setUser(prev => ({ ...prev, correctionCredits: 0, creditsExpireAt: undefined }));
-        return false;
+        // Check if admin
+        const adminSnap = await getDoc(doc(db, 'admins', fbUser.uid));
+        if (adminSnap.exists()) {
+          setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
+        }
+      } else {
+        setUser(null);
       }
-      setUser(prev => ({ ...prev, correctionCredits: prev.correctionCredits - amount }));
-      return true;
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Real-time Questions Fetching
+  useEffect(() => {
+    const q = query(collection(db, 'questions'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const qData = snapshot.docs.map(doc => doc.data() as Question);
+      setQuestions(qData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 3. Real-time Access Keys (Admins only)
+  useEffect(() => {
+    if (user?.role !== 'ADMIN') {
+      setAccessKeys([]);
+      return;
     }
-    return false;
-  };
+    const q = query(collection(db, 'accessKeys'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const kData = snapshot.docs.map(doc => doc.data() as AccessKey);
+      setAccessKeys(kData);
+    });
+    return () => unsubscribe();
+  }, [user?.role]);
 
-  const addCredits = (amount: number) => {
-    setUser(prev => {
-      const now = new Date();
-      const expiresAt = new Date();
-      expiresAt.setDate(now.getDate() + 30); // Credits expire in 30 days
+  const addAttempt = async (attempt: Attempt) => {
+    if (!user) return;
+    try {
+      const attemptRef = doc(collection(db, 'users', user.id, 'attempts'), attempt.id);
+      await setDoc(attemptRef, attempt);
       
-      return {
-        ...prev,
-        correctionCredits: prev.correctionCredits + amount,
+      // Update global user stats locally and on server
+      const userRef = doc(db, 'users', user.id);
+      const newAverage = Math.min(10, user.averageCLB + 0.1);
+      const newCRS = Math.min(600, user.estimatedCRS + 5);
+      
+      await updateDoc(userRef, {
+        averageCLB: newAverage,
+        estimatedCRS: newCRS
+      });
+      
+      setAttempts(prev => [attempt, ...prev]);
+    } catch (e) {
+      handleFirestoreError(e, 'create', `users/${user.id}/attempts/${attempt.id}`);
+    }
+  };
+
+  const deductCredit = async (amount: number) => {
+    if (!user) return false;
+    if (user.correctionCredits < amount) return false;
+    
+    // Check expiry
+    if (user.creditsExpireAt && new Date(user.creditsExpireAt) < new Date()) {
+      await updateDoc(doc(db, 'users', user.id), {
+        correctionCredits: 0,
+        creditsExpireAt: null
+      });
+      return false;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        correctionCredits: user.correctionCredits - amount
+      });
+      return true;
+    } catch (e) {
+      handleFirestoreError(e, 'update', `users/${user.id}`);
+    }
+  };
+
+  const addCredits = async (amount: number) => {
+    if (!user) return;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        correctionCredits: user.correctionCredits + amount,
         creditsExpireAt: expiresAt.toISOString()
-      };
-    });
+      });
+    } catch (e) {
+      handleFirestoreError(e, 'update', `users/${user.id}`);
+    }
   };
 
-  const addSubscription = (sub: Subscription) => {
-    setUser(prev => {
-      const existing = prev.subscriptions.find(s => s.testType === sub.testType);
-      if (existing) {
-        return {
-          ...prev,
-          subscriptions: prev.subscriptions.map(s => s.testType === sub.testType ? sub : s)
-        };
-      }
-      return {
-        ...prev,
-        subscriptions: [...prev.subscriptions, sub]
-      };
-    });
+  const addSubscription = async (sub: Subscription) => {
+    if (!user) return;
+    const updatedSubs = [...user.subscriptions];
+    const index = updatedSubs.findIndex(s => s.testType === sub.testType);
+    
+    if (index >= 0) {
+      updatedSubs[index] = sub;
+    } else {
+      updatedSubs.push(sub);
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        subscriptions: updatedSubs
+      });
+    } catch (e) {
+      handleFirestoreError(e, 'update', `users/${user.id}`);
+    }
   };
 
-  const generateAccessKey = (params: {
+  const saveQuestion = async (question: Question) => {
+    try {
+      await setDoc(doc(db, 'questions', question.id), question);
+    } catch (e) {
+      handleFirestoreError(e, 'create', `questions/${question.id}`);
+    }
+  };
+
+  const deleteQuestion = async (id: string) => {
+    try {
+      await setDoc(doc(db, 'questions', id), { isDeleted: true }, { merge: true });
+      // Actually delete if preferred, but soft-delete is safer.
+      // await deleteDoc(doc(db, 'questions', id));
+    } catch (e) {
+      handleFirestoreError(e, 'delete', `questions/${id}`);
+    }
+  };
+
+  const generateAccessKey = async (params: {
     type: 'SUBSCRIPTION' | 'CREDITS';
     test?: TestType;
     days?: number;
@@ -178,9 +232,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const key = Math.random().toString(36).substring(2, 10).toUpperCase();
     const now = new Date();
     const expiresIfUnusedAt = new Date();
-    expiresIfUnusedAt.setDate(now.getDate() + 7); // Key expires in 7 days if not used
+    expiresIfUnusedAt.setDate(now.getDate() + 7);
 
-    setAccessKeys(prev => [...prev, { 
+    const keyData: AccessKey = { 
       key, 
       type: params.type,
       testType: params.test, 
@@ -190,35 +244,82 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isUsed: false,
       createdAt: now.toISOString(),
       expiresIfUnusedAt: expiresIfUnusedAt.toISOString()
-    }]);
-    return key;
+    };
+
+    try {
+      await setDoc(doc(db, 'accessKeys', key), keyData);
+      return key;
+    } catch (e) {
+      handleFirestoreError(e, 'create', `accessKeys/${key}`);
+    }
   };
 
-  const useAccessKey = (key: string) => {
-    const found = accessKeys.find(k => 
-      k.key === key && 
-      !k.isUsed && 
-      new Date(k.expiresIfUnusedAt) > new Date()
-    );
+  const useAccessKey = async (key: string) => {
+    if (!user) return { success: false, message: "Vous devez être connecté." };
 
-    if (found) {
-      if (found.type === 'SUBSCRIPTION' && found.testType && found.durationDays && found.accessLevel) {
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + found.durationDays);
-        addSubscription({
-          testType: found.testType,
-          expiresAt: expiresAt.toISOString(),
-          accessLevel: found.accessLevel
-        });
-        setAccessKeys(prev => prev.map(k => k.key === key ? { ...k, isUsed: true } : k));
-        return { success: true, message: `Abonnement ${found.testType} activé pour ${found.durationDays} jours !` };
-      } else if (found.type === 'CREDITS' && found.creditAmount) {
-        addCredits(found.creditAmount);
-        setAccessKeys(prev => prev.map(k => k.key === key ? { ...k, isUsed: true } : k));
-        return { success: true, message: `${found.creditAmount} crédits IA ajoutés à votre compte !` };
-      }
+    try {
+      return await runTransaction(db, async (transaction) => {
+        const keyRef = doc(db, 'accessKeys', key);
+        const keySnap = await transaction.get(keyRef);
+
+        if (!keySnap.exists()) {
+          return { success: false, message: "Clé inexistante." };
+        }
+
+        const kData = keySnap.data() as AccessKey;
+
+        if (kData.isUsed) {
+          return { success: false, message: "Clé déjà utilisée." };
+        }
+
+        if (new Date(kData.expiresIfUnusedAt) < new Date()) {
+          return { success: false, message: "Clé expirée." };
+        }
+
+        // Mark as used
+        transaction.update(keyRef, { isUsed: true });
+
+        // Grant benefits
+        if (kData.type === 'SUBSCRIPTION' && kData.testType && kData.durationDays) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + kData.durationDays);
+          const newSub: Subscription = {
+            testType: kData.testType,
+            expiresAt: expiresAt.toISOString(),
+            accessLevel: kData.accessLevel || 'BASIC'
+          };
+          
+          const userRef = doc(db, 'users', user.id);
+          const userSnap = await transaction.get(userRef);
+          const userData = userSnap.data() as User;
+          
+          const updatedSubs = [...userData.subscriptions];
+          const index = updatedSubs.findIndex(s => s.testType === newSub.testType);
+          if (index >= 0) updatedSubs[index] = newSub;
+          else updatedSubs.push(newSub);
+
+          transaction.update(userRef, { subscriptions: updatedSubs });
+          return { success: true, message: `Abonnement ${kData.testType} activé pour ${kData.durationDays} jours !` };
+        } else if (kData.type === 'CREDITS' && kData.creditAmount) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30);
+          
+          const userRef = doc(db, 'users', user.id);
+          const userSnap = await transaction.get(userRef);
+          const userData = userSnap.data() as User;
+
+          transaction.update(userRef, { 
+            correctionCredits: userData.correctionCredits + kData.creditAmount,
+            creditsExpireAt: expiresAt.toISOString()
+          });
+          return { success: true, message: `${kData.creditAmount} crédits IA ajoutés !` };
+        }
+
+        return { success: false, message: "Erreur de configuration de la clé." };
+      });
+    } catch (e) {
+      handleFirestoreError(e, 'update', `accessKeys/${key}`);
     }
-    return { success: false, message: "Clé invalide, déjà utilisée ou expirée." };
   };
 
   return (
@@ -228,6 +329,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       attempts, 
       prices,
       accessKeys,
+      isLoading,
       setUser, 
       setQuestions, 
       setPrices,
@@ -235,6 +337,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deductCredit,
       addCredits,
       addSubscription,
+      saveQuestion,
+      deleteQuestion,
       generateAccessKey,
       useAccessKey
     }}>

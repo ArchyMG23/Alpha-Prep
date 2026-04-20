@@ -1,10 +1,69 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, PenTool, ShoppingCart, LogOut, CreditCard, Sparkles, ShieldCheck, BookOpen, Menu, X } from 'lucide-react';
+import { LayoutDashboard, PenTool, ShoppingCart, LogOut, CreditCard, Sparkles, ShieldCheck, BookOpen, Menu, X, LogIn, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { auth, googleProvider } from '../lib/firebase';
+import { signInWithPopup, signOut } from 'firebase/auth';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function Layout({ children, activeTab, setActiveTab }: { children: React.ReactNode, activeTab: string, setActiveTab: (t: string) => void }) {
-  const { user } = useAppContext();
+  const { user, isLoading } = useAppContext();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login Error:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      window.location.reload();
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-indigo-600" size={40} />
+          <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Chargement Alpha Prep...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-slate-100 p-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white p-10 rounded-[40px] border border-slate-200 shadow-2xl text-center"
+        >
+          <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center text-white font-bold text-4xl mx-auto mb-8 shadow-xl shadow-indigo-100 italic">
+            &alpha;
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Bienvenue sur Alpha Prep</h1>
+          <p className="text-slate-500 mb-10 font-medium">Rejoignez la communauté et commencez votre préparation aux tests de langue Canada.</p>
+          
+          <button 
+            onClick={handleLogin}
+            className="w-full py-5 bg-white border-2 border-slate-200 text-slate-800 font-black rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-lg shadow-slate-100"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" referrerPolicy="no-referrer" />
+            Continuer avec Google
+          </button>
+          
+          <p className="mt-8 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sécurisé par Firebase & Alpha Core</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,22 +94,24 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                {user.name.charAt(0)}
+                {user?.name?.charAt(0)}
               </div>
               <div className="overflow-hidden">
-                <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
-                <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
+                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               </div>
             </div>
-            <div className="flex items-center justify-between text-xs font-medium">
-              <span className={`px-2 py-1 rounded-md flex items-center gap-1 ${activeSubs.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>
-                {activeSubs.length > 0 ? <Sparkles size={12} /> : null}
-                {activeSubs.length > 0 ? 'Premium' : 'Gratuit'}
-              </span>
-              <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
-                <CreditCard size={12} /> {user.correctionCredits}
-              </span>
-            </div>
+            {user && (
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className={`px-2 py-1 rounded-md flex items-center gap-1 ${activeSubs.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>
+                  {activeSubs.length > 0 ? <Sparkles size={12} /> : null}
+                  {activeSubs.length > 0 ? 'Premium' : 'Gratuit'}
+                </span>
+                <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+                  <CreditCard size={12} /> {user.correctionCredits}
+                </span>
+              </div>
+            )}
           </div>
 
           <nav className="space-y-1">
@@ -76,7 +137,10 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
         </div>
 
         <div className="mt-auto p-4 border-t border-slate-200">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >
             <LogOut size={18} className="text-slate-400" />
             Déconnexion
           </button>

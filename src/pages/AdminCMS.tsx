@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, S
 import { parseExamDocument } from '../services/geminiService';
 
 export default function AdminCMS() {
-  const { questions, setQuestions, prices, setPrices, generateAccessKey, accessKeys } = useAppContext();
+  const { questions, prices, setPrices, generateAccessKey, accessKeys, saveQuestion, deleteQuestion } = useAppContext();
   const [isAdding, setIsAdding] = useState(false);
   const [isManagingPrices, setIsManagingPrices] = useState(false);
   const [isGeneratingKeys, setIsGeneratingKeys] = useState(false);
@@ -88,28 +88,37 @@ export default function AdminCMS() {
     }
   };
 
-  const handleConfirmDetected = () => {
-    const newQuestions: Question[] = detectedQuestions.map((dq, index) => ({
-      id: `q_${Date.now()}_${index}`,
-      testType: dq.testType as TestType,
-      type: dq.type as TaskType,
-      level: dq.level as Level,
-      title: dq.title || 'Sans titre',
-      content: dq.content || '',
-      isPremium: dq.isPremium || false,
-      isFullAccessOnly: dq.isFullAccessOnly || false,
-      requiredCredits: dq.requiredCredits || 0,
-      sourceFile: dq.sourceFile
-    }));
-
-    setQuestions([...newQuestions, ...questions]);
-    setDetectedQuestions([]);
-    setIsAdding(false);
-    setSuccessMsg(`${newQuestions.length} exercices ajoutés au CMS avec succès !`);
-    setTimeout(() => setSuccessMsg(''), 3000);
+  const handleConfirmDetected = async () => {
+    setIsUploading(true);
+    try {
+      for (const [index, dq] of detectedQuestions.entries()) {
+        const question: Question = {
+          id: `q_${Date.now()}_${index}`,
+          testType: dq.testType as TestType,
+          type: dq.type as TaskType,
+          level: dq.level as Level,
+          title: dq.title || 'Sans titre',
+          content: dq.content || '',
+          isPremium: dq.isPremium || false,
+          isFullAccessOnly: dq.isFullAccessOnly || false,
+          requiredCredits: dq.requiredCredits || 0,
+          sourceFile: dq.sourceFile
+        };
+        await saveQuestion(question);
+      }
+      setDetectedQuestions([]);
+      setIsAdding(false);
+      setSuccessMsg(`${detectedQuestions.length} exercices ajoutés avec succès via Firestore !`);
+    } catch (error) {
+      console.error("Save Error:", error);
+      alert("Erreur lors de l'enregistrement des exercices.");
+    } finally {
+      setIsUploading(false);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
   };
 
-  const handleSaveQuestion = () => {
+  const handleSaveQuestion = async () => {
     if (!newQ.title || !newQ.content) return;
     const question: Question = {
       id: `q_${Date.now()}`,
@@ -123,9 +132,9 @@ export default function AdminCMS() {
       requiredCredits: newQ.requiredCredits || 0,
       sourceFile: newQ.sourceFile
     };
-    setQuestions([question, ...questions]);
+    await saveQuestion(question);
     setIsAdding(false);
-    setSuccessMsg("Question ajoutée !");
+    setSuccessMsg("Question ajoutée et sauvegardée !");
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -252,16 +261,16 @@ export default function AdminCMS() {
               </select>
             )}
             <button 
-              onClick={() => {
+              onClick={async () => {
                 if (keyType === 'SUBSCRIPTION') {
                   const t = (document.getElementById('keyTest') as HTMLSelectElement).value as TestType;
                   const d = parseInt((document.getElementById('keyDays') as HTMLSelectElement).value);
                   const l = (document.getElementById('keyLevel') as HTMLSelectElement).value as 'BASIC' | 'FULL';
-                  const key = generateAccessKey({ type: 'SUBSCRIPTION', test: t, days: d, level: l });
+                  const key = await generateAccessKey({ type: 'SUBSCRIPTION', test: t, days: d, level: l });
                   setSuccessMsg(`Clé Abonnement générée : ${key}`);
                 } else {
                   const c = parseInt((document.getElementById('keyCredits') as HTMLSelectElement).value);
-                  const key = generateAccessKey({ type: 'CREDITS', credits: c });
+                  const key = await generateAccessKey({ type: 'CREDITS', credits: c });
                   setSuccessMsg(`Clé Crédits générée : ${key}`);
                 }
               }}
@@ -400,7 +409,7 @@ export default function AdminCMS() {
                 <td className="p-4 md:p-6 text-right">
                   <div className="flex justify-end gap-2">
                     <button className="p-2 text-slate-400 hover:text-indigo-600"><Edit2 size={16} /></button>
-                    <button className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={16} /></button>
+                    <button onClick={() => deleteQuestion(q.id)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={16} /></button>
                   </div>
                 </td>
               </tr>

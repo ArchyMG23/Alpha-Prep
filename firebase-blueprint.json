@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["USER", "ADMIN"] },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "testType": { "type": "string" },
+              "expiresAt": { "type": "string", "format": "date-time" },
+              "accessLevel": { "type": "string" }
+            }
+          }
+        },
+        "correctionCredits": { "type": "integer" },
+        "creditsExpireAt": { "type": "string", "format": "date-time" },
+        "estimatedCRS": { "type": "integer" },
+        "averageCLB": { "type": "number" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Exam question or methodology module",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "testType": { "type": "string" },
+        "type": { "type": "string" },
+        "level": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "isPremium": { "type": "boolean" },
+        "isFullAccessOnly": { "type": "boolean" },
+        "requiredCredits": { "type": "integer" },
+        "sourceFile": { "type": "string" }
+      },
+      "required": ["id", "testType", "type", "level", "title", "content"]
+    },
+    "AccessKey": {
+      "title": "AccessKey",
+      "description": "Code to activate subscriptions or credits",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "type": { "type": "string", "enum": ["SUBSCRIPTION", "CREDITS"] },
+        "testType": { "type": "string" },
+        "durationDays": { "type": "integer" },
+        "accessLevel": { "type": "string" },
+        "creditAmount": { "type": "integer" },
+        "isUsed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresIfUnusedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["key", "type", "isUsed", "createdAt", "expiresIfUnusedAt"]
+    },
+    "Attempt": {
+      "title": "Attempt",
+      "description": "User exercise attempt and result",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "questionId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "scoreCLB": { "type": "number" },
+        "feedback": { "type": "string" }
+      },
+      "required": ["id", "userId", "questionId", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/questions/{questionId}": { "schema": "Question", "description": "Global test questions" },
+    "/accessKeys/{key}": { "schema": "AccessKey", "description": "Access codes" },
+    "/users/{userId}/attempts/{attemptId}": { "schema": "Attempt", "description": "User specific attempts" },
+    "/admins/{userId}": { "schema": { "type": "object", "properties": { "id": { "type": "string" } } }, "description": "Admin list" }
+  }
+}
