@@ -102,13 +102,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 2. Real-time Questions Fetching
   useEffect(() => {
+    if (!user) {
+      setQuestions([]);
+      return;
+    }
     const q = query(collection(db, 'questions'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const qData = snapshot.docs.map(doc => doc.data() as Question);
       setQuestions(qData);
+    }, (error) => {
+      console.warn("Firestore Questions Listener Error:", error);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.id]);
 
   // 3. Real-time Access Keys (Admins only)
   useEffect(() => {
@@ -120,9 +126,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const kData = snapshot.docs.map(doc => doc.data() as AccessKey);
       setAccessKeys(kData);
+    }, (error) => {
+      console.warn("Firestore AccessKeys Listener Error:", error);
     });
     return () => unsubscribe();
-  }, [user?.role]);
+  }, [user?.role, user?.id]);
+
+  // 4. Real-time User Attempts Fetching
+  useEffect(() => {
+    if (!user) {
+      setAttempts([]);
+      return;
+    }
+    const q = query(collection(db, 'users', user.id, 'attempts'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const aData = snapshot.docs.map(doc => doc.data() as Attempt);
+      // Sort by date descending
+      setAttempts(aData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    }, (error) => {
+      console.warn("Firestore Attempts Listener Error:", error);
+    });
+    return () => unsubscribe();
+  }, [user?.id]);
 
   const addAttempt = async (attempt: Attempt) => {
     if (!user) return;

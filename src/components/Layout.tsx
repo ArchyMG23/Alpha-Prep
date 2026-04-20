@@ -9,11 +9,25 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
   const { user, isLoading } = useAppContext();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const handleLogin = async () => {
+    setLoginError(null);
+    setIsLoggingIn(true);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login Error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        setLoginError("Le popup a été bloqué par votre navigateur. Veuillez autoriser les popups pour ce site.");
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // User closed the popup, no need for error message usually
+      } else {
+        setLoginError("Une erreur est survenue lors de la connexion. Veuillez réessayer.");
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -53,11 +67,26 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
           
           <button 
             onClick={handleLogin}
-            className="w-full py-5 bg-white border-2 border-slate-200 text-slate-800 font-black rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-lg shadow-slate-100"
+            disabled={isLoggingIn}
+            className="w-full py-5 bg-white border-2 border-slate-200 text-slate-800 font-black rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-lg shadow-slate-100 disabled:opacity-50"
           >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" referrerPolicy="no-referrer" />
-            Continuer avec Google
+            {isLoggingIn ? (
+              <Loader2 className="animate-spin" size={24} />
+            ) : (
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" referrerPolicy="no-referrer" />
+            )}
+            {isLoggingIn ? 'Connexion en cours...' : 'Continuer avec Google'}
           </button>
+
+          {loginError && (
+            <motion.p 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-6 text-sm font-black text-rose-500 bg-rose-50 p-4 rounded-2xl border border-rose-100"
+            >
+              {loginError}
+            </motion.p>
+          )}
           
           <p className="mt-8 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sécurisé par Firebase & Alpha Core</p>
         </motion.div>
