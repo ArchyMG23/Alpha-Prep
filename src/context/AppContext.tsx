@@ -60,61 +60,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [accessKeys, setAccessKeys] = useState<AccessKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Auth & User Profile Management
+  // 1. Local Device Identity & Profile Management
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        // Sync user profile from Firestore
-        const userRef = doc(db, 'users', fbUser.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          setUser(userSnap.data() as User);
-        } else {
-          // Create initial profile
-          const newUser: User = {
-            id: fbUser.uid,
-            name: fbUser.displayName || 'Étudiant',
-            email: fbUser.email || '',
-            role: 'USER',
-            subscriptions: [],
-            correctionCredits: 0,
-            estimatedCRS: 0,
-            averageCLB: 0
-          };
-          await setDoc(userRef, newUser);
-          setUser(newUser);
-        }
-
-        // Check if admin
-        const adminSnap = await getDoc(doc(db, 'admins', fbUser.uid));
-        if (adminSnap.exists()) {
-          setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
-        }
-      } else {
-        setUser(null);
+    const initApp = async () => {
+      let localId = localStorage.getItem('alpha_prep_user_id');
+      if (!localId) {
+        localId = 'user_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('alpha_prep_user_id', localId);
       }
-      setIsLoading(false);
-    });
 
-    return () => unsubscribe();
+      const userRef = doc(db, 'users', localId);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        setUser(userSnap.data() as User);
+      } else {
+        // Create initial profile linked to this device
+        const newUser: User = {
+          id: localId,
+          name: 'Étudiant ' + localId.substring(5, 9).toUpperCase(),
+          email: 'anonymous@device.local',
+          role: 'USER',
+          subscriptions: [],
+          correctionCredits: 0,
+          estimatedCRS: 0,
+          averageCLB: 0
+        };
+        await setDoc(userRef, newUser);
+        setUser(newUser);
+      }
+
+      // Check if this specific device ID is granted admin status
+      const adminSnap = await getDoc(doc(db, 'admins', localId));
+      if (adminSnap.exists()) {
+        setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
+      }
+      
+      setIsLoading(false);
+    };
+
+    initApp();
   }, []);
 
-  // 2. Real-time Questions Fetching
+  // 2. Real-time Questions Fetching (Always available)
   useEffect(() => {
-    if (!user) {
-      setQuestions([]);
-      return;
-    }
     const q = query(collection(db, 'questions'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const qData = snapshot.docs.map(doc => doc.data() as Question);
+      // Filter out soft-deleted items
+      const qData = snapshot.docs
+        .map(doc => doc.data() as Question)
+        .filter(q => (q as any).isDeleted !== true);
       setQuestions(qData);
     }, (error) => {
       console.warn("Firestore Questions Listener Error:", error);
     });
     return () => unsubscribe();
-  }, [user?.id]);
+  }, []);
 
   // 3. Real-time Access Keys (Admins only)
   useEffect(() => {

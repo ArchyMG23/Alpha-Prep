@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, S
 import { parseExamDocument } from '../services/geminiService';
 
 export default function AdminCMS() {
-  const { questions, prices, setPrices, generateAccessKey, accessKeys, saveQuestion, deleteQuestion } = useAppContext();
+  const { user, questions, prices, setPrices, generateAccessKey, accessKeys, saveQuestion, deleteQuestion } = useAppContext();
   const [isAdding, setIsAdding] = useState(false);
   const [isManagingPrices, setIsManagingPrices] = useState(false);
   const [isGeneratingKeys, setIsGeneratingKeys] = useState(false);
@@ -46,7 +46,8 @@ export default function AdminCMS() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAdminAuth = () => {
-    if (adminCode === '2026') { // Simple code for demo
+    // Authorized if code matches or if the device ID is flagged as admin in Firestore
+    if (adminCode === '2026' || user?.role === 'ADMIN') {
       setIsAuthorized(true);
       setAdminCode('');
     } else {
@@ -102,13 +103,14 @@ export default function AdminCMS() {
           isPremium: dq.isPremium || false,
           isFullAccessOnly: dq.isFullAccessOnly || false,
           requiredCredits: dq.requiredCredits || 0,
-          sourceFile: dq.sourceFile
-        };
+          sourceFile: dq.sourceFile,
+          createdAt: new Date().toISOString()
+        } as any;
         await saveQuestion(question);
       }
       setDetectedQuestions([]);
       setIsAdding(false);
-      setSuccessMsg(`${detectedQuestions.length} exercices ajoutés avec succès via Firestore !`);
+      setSuccessMsg(`${detectedQuestions.length} exercices ajoutés avec succès !`);
     } catch (error) {
       console.error("Save Error:", error);
       alert("Erreur lors de l'enregistrement des exercices.");
@@ -130,8 +132,9 @@ export default function AdminCMS() {
       isPremium: newQ.isPremium || false,
       isFullAccessOnly: newQ.isFullAccessOnly || false,
       requiredCredits: newQ.requiredCredits || 0,
-      sourceFile: newQ.sourceFile
-    };
+      sourceFile: newQ.sourceFile,
+      createdAt: new Date().toISOString()
+    } as any;
     await saveQuestion(question);
     setIsAdding(false);
     setSuccessMsg("Question ajoutée et sauvegardée !");

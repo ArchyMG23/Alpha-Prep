@@ -51,49 +51,6 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
     );
   }
 
-  if (!user) {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-slate-100 p-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white p-10 rounded-[40px] border border-slate-200 shadow-2xl text-center"
-        >
-          <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center text-white font-bold text-4xl mx-auto mb-8 shadow-xl shadow-indigo-100 italic">
-            &alpha;
-          </div>
-          <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Bienvenue sur Alpha Prep</h1>
-          <p className="text-slate-500 mb-10 font-medium">Rejoignez la communauté et commencez votre préparation aux tests de langue Canada.</p>
-          
-          <button 
-            onClick={handleLogin}
-            disabled={isLoggingIn}
-            className="w-full py-5 bg-white border-2 border-slate-200 text-slate-800 font-black rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-lg shadow-slate-100 disabled:opacity-50"
-          >
-            {isLoggingIn ? (
-              <Loader2 className="animate-spin" size={24} />
-            ) : (
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" referrerPolicy="no-referrer" />
-            )}
-            {isLoggingIn ? 'Connexion en cours...' : 'Continuer avec Google'}
-          </button>
-
-          {loginError && (
-            <motion.p 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mt-6 text-sm font-black text-rose-500 bg-rose-50 p-4 rounded-2xl border border-rose-100"
-            >
-              {loginError}
-            </motion.p>
-          )}
-          
-          <p className="mt-8 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sécurisé par Firebase & Alpha Core</p>
-        </motion.div>
-      </div>
-    );
-  }
-
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'exam', label: 'Simulations', icon: PenTool },
@@ -101,7 +58,7 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
     { id: 'store', label: 'Boutique', icon: ShoppingCart },
   ];
 
-  const activeSubs = user.subscriptions.filter(s => new Date(s.expiresAt) > new Date());
+  const activeSubs = user?.subscriptions.filter(s => new Date(s.expiresAt) > new Date()) || [];
 
   const handleTabChange = (id: string) => {
     setActiveTab(id);
@@ -113,24 +70,24 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-slate-200">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3">
+          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3 select-none cursor-default">
             &alpha;
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-800">Alpha Prep</span>
         </div>
 
         <div className="p-4 overflow-y-auto">
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                {user?.name?.charAt(0)}
+          {user && (
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold overflow-hidden">
+                  <span className="text-xs uppercase">{user?.id?.substring(5, 9)}</span>
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate opacity-50">Local ID: {user?.id?.substring(0, 8)}...</p>
+                </div>
               </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
-                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
-              </div>
-            </div>
-            {user && (
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className={`px-2 py-1 rounded-md flex items-center gap-1 ${activeSubs.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>
                   {activeSubs.length > 0 ? <Sparkles size={12} /> : null}
@@ -140,8 +97,8 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
                   <CreditCard size={12} /> {user.correctionCredits}
                 </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <nav className="space-y-1">
             {navItems.map((item) => {
@@ -166,17 +123,10 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
         </div>
 
         <div className="mt-auto p-4 border-t border-slate-200">
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            <LogOut size={18} className="text-slate-400" />
-            Déconnexion
-          </button>
-          <div className="mt-4 text-[10px] text-slate-400 text-center">
+          <div className="text-[10px] text-slate-400 text-center">
             <button 
-              onClick={() => handleTabChange('cms')}
-              className="hover:text-slate-600 transition-colors"
+              onDoubleClick={() => handleTabChange('cms')}
+              className="hover:text-slate-300 transition-colors cursor-default"
             >
               © 2026 Alpha Prep. Tous droits réservés.
             </button>
