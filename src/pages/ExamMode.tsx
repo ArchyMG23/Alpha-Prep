@@ -157,9 +157,28 @@ export default function ExamMode() {
             ) : (
               <div className="space-y-8">
                 <div className="prose prose-slate max-w-none">
-                  <p className="text-lg text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
-                    {selectedQuestion.content}
-                  </p>
+                  <div className="text-lg text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
+                    {/* Render audio if it's a listening task and contains a URL */}
+                    {selectedQuestion.type === 'LISTENING' && selectedQuestion.content.includes('http') && (
+                      <div className="mb-6 p-6 bg-indigo-50 border border-indigo-100 rounded-3xl">
+                        <p className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                          <Headphones size={14} /> Contenu Audio
+                        </p>
+                        <audio 
+                          controls 
+                          className="w-full" 
+                          src={selectedQuestion.content.match(/https?:\/\/[^\s]+/)?.[0]}
+                        >
+                          Votre navigateur ne supporte pas l'élément audio.
+                        </audio>
+                      </div>
+                    )}
+                    {/* Filter out the URL from the text if displayed in the player */}
+                    {selectedQuestion.content.split('\n').map((line, i) => {
+                      if (line.toLowerCase().startsWith('audio:')) return null;
+                      return <p key={i}>{line}</p>;
+                    })}
+                  </div>
                 </div>
 
                 {selectedQuestion.type === 'WRITING' && (
@@ -185,39 +204,57 @@ export default function ExamMode() {
                   </div>
                 )}
 
-                {(selectedQuestion.type === 'READING' || selectedQuestion.type === 'LISTENING') && selectedQuestion.options && (
+                {(selectedQuestion.type === 'READING' || selectedQuestion.type === 'LISTENING') && (
                   <div className="space-y-4">
-                    {selectedQuestion.options.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setMcqAnswers({ ...mcqAnswers, [selectedQuestion.id]: opt.id })}
-                        className={`w-full p-6 rounded-2xl border-2 text-left transition-all flex items-center justify-between ${
-                          mcqAnswers[selectedQuestion.id] === opt.id 
-                            ? 'border-indigo-600 bg-indigo-50 text-indigo-900' 
-                            : 'border-slate-100 hover:border-slate-200 text-slate-600'
-                        }`}
+                    {selectedQuestion.options ? (
+                      selectedQuestion.options.map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setMcqAnswers({ ...mcqAnswers, [selectedQuestion.id]: opt.id })}
+                          className={`w-full p-6 rounded-2xl border-2 text-left transition-all flex items-center justify-between ${
+                            mcqAnswers[selectedQuestion.id] === opt.id 
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-900' 
+                              : 'border-slate-100 hover:border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          <span className="font-bold">{opt.text}</span>
+                          {mcqAnswers[selectedQuestion.id] === opt.id && <CheckCircle2 size={20} className="text-indigo-600" />}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-sm font-bold text-slate-400 text-center italic py-4">Simulation en cours de développement...</p>
+                    )}
+                    
+                    {(selectedQuestion.options || selectedQuestion.type === 'LISTENING') && (
+                      <button 
+                        onClick={submitExam}
+                        className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl mt-8 shadow-xl shadow-indigo-200"
                       >
-                        <span className="font-bold">{opt.text}</span>
-                        {mcqAnswers[selectedQuestion.id] === opt.id && <CheckCircle2 size={20} className="text-indigo-600" />}
+                        Valider mes réponses
                       </button>
-                    ))}
-                    <button 
-                      onClick={submitExam}
-                      className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl mt-8 shadow-xl shadow-indigo-200"
-                    >
-                      Valider mes réponses
-                    </button>
+                    )}
                   </div>
                 )}
 
                 {selectedQuestion.type === 'METHODOLOGY' && (
-                  <div className="bg-indigo-50 p-8 rounded-3xl border border-indigo-100">
-                    <h4 className="text-indigo-900 font-black mb-4 flex items-center gap-2 uppercase tracking-widest text-sm">
-                      <BookOpen size={18} /> Guide Méthodologique
-                    </h4>
-                    <p className="text-indigo-800 leading-relaxed font-medium">
-                      {selectedQuestion.methodologyContent}
-                    </p>
+                  <div className="space-y-6">
+                    <div className="bg-indigo-50 p-8 rounded-[40px] border border-indigo-100 shadow-inner">
+                      <h4 className="text-indigo-900 font-black mb-6 flex items-center gap-3 uppercase tracking-[0.2em] text-xs">
+                        <Sparkles size={20} className="text-indigo-500" /> Guide Méthodologique Officiel
+                      </h4>
+                      <div className="text-indigo-800 leading-relaxed font-semibold italic p-4 bg-white/50 rounded-2xl border border-white/50">
+                        {selectedQuestion.methodologyContent || "Contenu méthodologique à venir."}
+                      </div>
+                    </div>
+                    
+                    <div className="p-8 bg-slate-50 rounded-[40px] border border-slate-100">
+                      <h4 className="text-slate-400 font-black mb-4 uppercase tracking-widest text-[10px]">Points Clés</h4>
+                      <ul className="space-y-3">
+                        <li className="flex items-start gap-2 text-sm text-slate-600 font-medium"><div className="w-1.5 h-1.5 bg-indigo-500 rounded-full mt-1.5 shrink-0" /> Comprendre la structure</li>
+                        <li className="flex items-start gap-2 text-sm text-slate-600 font-medium"><div className="w-1.5 h-1.5 bg-indigo-500 rounded-full mt-1.5 shrink-0" /> Gestion du temps</li>
+                        <li className="flex items-start gap-2 text-sm text-slate-600 font-medium"><div className="w-1.5 h-1.5 bg-indigo-500 rounded-full mt-1.5 shrink-0" /> Critères de notation</li>
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>

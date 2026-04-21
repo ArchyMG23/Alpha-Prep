@@ -6,6 +6,7 @@ import { BookOpen, PenTool, Headphones, MessageSquare, Globe, ChevronRight, Lock
 export default function Methodology() {
   const { user, questions } = useAppContext();
   const [selectedTest, setSelectedTest] = useState<TestType>('TCF');
+  const [selectedMethodology, setSelectedMethodology] = useState<any | null>(null);
 
   const methodologyQuestions = questions.filter(q => q.testType === selectedTest && q.type === 'METHODOLOGY');
 
@@ -45,7 +46,7 @@ export default function Methodology() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 px-4 md:px-0">
         {categories.map(cat => {
-          const items = methodologyQuestions.filter(q => q.title.toLowerCase().includes(cat.label.toLowerCase()) || q.content.toLowerCase().includes(cat.label.toLowerCase()));
+          const items = methodologyQuestions.filter(q => q.title.toLowerCase().includes(cat.label.toLowerCase()) || q.content.toLowerCase().includes(cat.label.toLowerCase()) || q.title.toLowerCase().includes(cat.id.toLowerCase()));
           const isLocked = !hasFullAccess(selectedTest);
 
           return (
@@ -67,7 +68,11 @@ export default function Methodology() {
               <div className="p-5 md:p-6 space-y-3 md:space-y-4 flex-1">
                 {items.length > 0 ? (
                   items.map(item => (
-                    <div key={item.id} className="group cursor-pointer">
+                    <div 
+                      key={item.id} 
+                      className="group cursor-pointer"
+                      onClick={() => !isLocked && setSelectedMethodology(item)}
+                    >
                       <div className={`p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all flex items-center justify-between ${isLocked ? 'opacity-50 grayscale' : ''}`}>
                         <div className="overflow-hidden">
                           <p className="font-bold text-slate-900 text-sm md:text-base truncate">{item.title}</p>
@@ -95,6 +100,43 @@ export default function Methodology() {
           );
         })}
       </div>
+
+      {selectedMethodology && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-8 bg-indigo-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Méthodologie • {selectedMethodology.testType}</span>
+                <h2 className="text-xl md:text-2xl font-black mt-1 tracking-tight">{selectedMethodology.title}</h2>
+              </div>
+              <button onClick={() => setSelectedMethodology(null)} className="p-2 hover:bg-white/10 rounded-xl"><ChevronRight className="rotate-90" /></button>
+            </div>
+            <div className="p-8 max-h-[70vh] overflow-y-auto">
+              <div className="prose prose-slate max-w-none">
+                <p className="text-slate-700 leading-relaxed font-semibold italic p-6 bg-slate-50 rounded-3xl border border-slate-100 whitespace-pre-wrap">
+                  {selectedMethodology.content}
+                </p>
+                {selectedMethodology.methodologyContent && (
+                  <div className="mt-6 p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
+                    <h4 className="text-indigo-900 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                       <Sparkles size={16} /> Détails Stratégiques
+                    </h4>
+                    <p className="text-indigo-800 text-sm font-medium whitespace-pre-wrap">
+                      {selectedMethodology.methodologyContent}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <button 
+                onClick={() => setSelectedMethodology(null)} 
+                className="w-full mt-10 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl active:scale-95 transition-transform"
+              >
+                J'ai compris
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* General Tips Section */}
       <div className="mx-4 md:mx-0 bg-indigo-900 rounded-3xl p-8 md:p-10 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">

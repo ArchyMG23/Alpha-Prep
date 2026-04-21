@@ -16,7 +16,9 @@ function getAI() {
 
 export async function parseExamDocument(fileData: string, mimeType: string, fileName: string): Promise<Partial<Question>[]> {
   const ai = getAI();
-  const isText = mimeType.startsWith('text/') || fileName.endsWith('.txt') || fileName.endsWith('.md');
+  console.log(`Starting parsing for ${fileName} (${mimeType})...`);
+
+  const isText = mimeType.startsWith('text/') || fileName.endsWith('.txt') || fileName.endsWith('.md') || !mimeType;
   
   const prompt = `Analyze the provided document "${fileName}". 
   This document contains content for language exams (TCF Canada, TEF Canada, or IELTS).
@@ -32,12 +34,28 @@ export async function parseExamDocument(fileData: string, mimeType: string, file
   
   Return a JSON array of these exercises.`;
 
+  let contentPart;
+  if (isText) {
+    // If it's data url from FileReader.readAsDataURL for a text file
+    let rawText = fileData;
+    if (fileData.startsWith('data:')) {
+      try {
+        const base64 = fileData.split(',')[1];
+        rawText = atob(base64);
+      } catch (e) {
+        console.warn("Could not decode text file from data URL, using raw data.");
+      }
+    }
+    contentPart = { text: `Document Content:\n${rawText}` };
+  } else {
+    const data = fileData.includes(',') ? fileData.split(',')[1] : fileData;
+    contentPart = { inlineData: { mimeType: mimeType || 'application/octet-stream', data } };
+  }
+
   const contents = {
     parts: [
       { text: prompt },
-      isText 
-        ? { text: `Document Content:\n${fileData}` }
-        : { inlineData: { mimeType, data: fileData.split(',')[1] || fileData } }
+      contentPart
     ]
   };
 
@@ -67,10 +85,11 @@ export async function parseExamDocument(fileData: string, mimeType: string, file
     });
 
     const text = response.text;
+    console.log("Gemini response extracted successfully.");
     if (!text) return [];
     return JSON.parse(text);
   } catch (error) {
-    console.error("Gemini Parsing Error:", error);
-    return [];
+    console.error("Gemini Parsing Error Details:", error);
+    throw error; // Throw so UI can see 
   }
 }

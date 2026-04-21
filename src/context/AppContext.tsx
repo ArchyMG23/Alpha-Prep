@@ -42,12 +42,11 @@ interface AppState {
 }
 
 const initialPrices: PlanPrice[] = [
-  { id: 'p1', testType: 'TCF', durationDays: 10, priceXAF: 10000, accessLevel: 'BASIC' },
-  { id: 'p2', testType: 'TCF', durationDays: 15, priceXAF: 15000, accessLevel: 'BASIC' },
-  { id: 'p3', testType: 'TCF', durationDays: 30, priceXAF: 25000, accessLevel: 'FULL' },
-  { id: 'p4', testType: 'TCF', durationDays: 60, priceXAF: 45000, accessLevel: 'FULL' },
-  { id: 'p5', testType: 'TEF', durationDays: 30, priceXAF: 25000, accessLevel: 'FULL' },
-  { id: 'p6', testType: 'IELTS', durationDays: 30, priceXAF: 30000, accessLevel: 'FULL' },
+  { id: 'tcf_full', testType: 'TCF', durationDays: 30, priceXAF: 15000, accessLevel: 'FULL', creditAmount: 10 },
+  { id: 'tef_full', testType: 'TEF', durationDays: 30, priceXAF: 15000, accessLevel: 'FULL', creditAmount: 10 },
+  { id: 'ielts_full', testType: 'IELTS', durationDays: 30, priceXAF: 20000, accessLevel: 'FULL', creditAmount: 10 },
+  { id: 'full_all', testType: 'TCF', durationDays: 30, priceXAF: 35000, accessLevel: 'FULL', creditAmount: 30 }, // Special full pass
+  { id: 'credits_pack', testType: 'TCF', durationDays: 0, priceXAF: 5000, accessLevel: 'BASIC', creditAmount: 20 }
 ];
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -59,6 +58,84 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [prices, setPrices] = useState<PlanPrice[]>(initialPrices);
   const [accessKeys, setAccessKeys] = useState<AccessKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Helper to seed sample data if empty
+  const seedData = async () => {
+    if (questions.length > 0) return;
+    
+    const samples: Question[] = [
+      {
+        id: 'sample_tcf_oral_1',
+        testType: 'TCF',
+        type: 'LISTENING',
+        level: 'B2',
+        title: 'TCF Canada - Compréhension Orale - Tâche 1',
+        content: 'Écoutez l\'audio et répondez à la question.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\n\nQuestion: Quel est le sujet principal de la conversation ?',
+        isPremium: true,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'sample_tef_writing_1',
+        testType: 'TEF',
+        type: 'WRITING',
+        level: 'B2',
+        title: 'TEF Canada - Expression Écrite - Fait Divers',
+        content: 'Sujet: Vous avez lu cette annonce dans un journal. Écrivez un article pour raconter la suite de l\'histoire.\n\n"Un homme a trouvé un trésor dans son jardin hier matin..."',
+        isPremium: true,
+        isFullAccessOnly: false,
+        requiredCredits: 1,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'meth_tcf_writing',
+        testType: 'TCF',
+        type: 'METHODOLOGY',
+        level: 'B2',
+        title: 'TCF Canada - Méthodologie Expression Écrite',
+        content: 'La Tâche 1 consiste à rédiger un message court. \nConseils:\n- Respectez le nombre de mots (60-120).\n- Utilisez des connecteurs logiques (Et, De plus, Enfin).\n- Soignez votre orthographe.',
+        isPremium: false,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'meth_tef_writing',
+        testType: 'TEF',
+        type: 'METHODOLOGY',
+        level: 'B2',
+        title: 'TEF Canada - Méthodologie Fait Divers',
+        content: 'La Section A demande de raconter la suite d\'un fait divers.\n- Utilisez le passé composé et l\'imparfait.\n- Structurez votre récit (début, péripéties, conclusion).\n- Soyez créatif mais cohérent.',
+        isPremium: false,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'meth_ielts_writing',
+        testType: 'IELTS',
+        type: 'METHODOLOGY',
+        level: 'C1',
+        title: 'IELTS Writing Task 2 - Essay Methodology',
+        content: 'Structure recommendations:\n1. Introduction: Hook + Thesis statement.\n2. Body Paragraphs: One idea per paragraph with examples.\n3. Conclusion: Reiterate point without new info.',
+        isPremium: false,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: new Date().toISOString()
+      }
+    ] as any;
+
+    for (const s of samples) {
+      await setDoc(doc(db, 'questions', s.id), s);
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoading && questions.length === 0) {
+      seedData();
+    }
+  }, [isLoading, questions.length]);
 
   // 1. Local Device Identity & Profile Management
   useEffect(() => {
@@ -302,46 +379,60 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return { success: false, message: "Clé expirée." };
         }
 
-        // Mark as used
-        transaction.update(keyRef, { isUsed: true });
+        const userRef = doc(db, 'users', user.id);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) return { success: false, message: "Utilisateur introuvable." };
+        const userData = userSnap.data() as User;
 
-        // Grant benefits
-        if (kData.type === 'SUBSCRIPTION' && kData.testType && kData.durationDays) {
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + kData.durationDays);
+        const updates: any = {};
+        let successDetail = "";
+
+        // Grant Subscription Duration
+        if (kData.testType && kData.durationDays) {
+          const updatedSubs = [...(userData.subscriptions || [])];
+          const subIdx = updatedSubs.findIndex(s => s.testType === kData.testType);
+          
+          let expiryDate = new Date();
+          const existingSub = updatedSubs[subIdx];
+          if (existingSub && new Date(existingSub.expiresAt) > new Date()) {
+            expiryDate = new Date(existingSub.expiresAt);
+          }
+          expiryDate.setDate(expiryDate.getDate() + kData.durationDays);
+
           const newSub: Subscription = {
             testType: kData.testType,
-            expiresAt: expiresAt.toISOString(),
-            accessLevel: kData.accessLevel || 'BASIC'
+            expiresAt: expiryDate.toISOString(),
+            accessLevel: kData.accessLevel || 'FULL'
           };
-          
-          const userRef = doc(db, 'users', user.id);
-          const userSnap = await transaction.get(userRef);
-          const userData = userSnap.data() as User;
-          
-          const updatedSubs = [...userData.subscriptions];
-          const index = updatedSubs.findIndex(s => s.testType === newSub.testType);
-          if (index >= 0) updatedSubs[index] = newSub;
+
+          if (subIdx >= 0) updatedSubs[subIdx] = newSub;
           else updatedSubs.push(newSub);
-
-          transaction.update(userRef, { subscriptions: updatedSubs });
-          return { success: true, message: `Abonnement ${kData.testType} activé pour ${kData.durationDays} jours !` };
-        } else if (kData.type === 'CREDITS' && kData.creditAmount) {
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + 30);
           
-          const userRef = doc(db, 'users', user.id);
-          const userSnap = await transaction.get(userRef);
-          const userData = userSnap.data() as User;
-
-          transaction.update(userRef, { 
-            correctionCredits: userData.correctionCredits + kData.creditAmount,
-            creditsExpireAt: expiresAt.toISOString()
-          });
-          return { success: true, message: `${kData.creditAmount} crédits IA ajoutés !` };
+          updates.subscriptions = updatedSubs;
+          successDetail += `Pass ${kData.testType} (${kData.durationDays}j)`;
         }
 
-        return { success: false, message: "Erreur de configuration de la clé." };
+        // Grant AI Credits
+        if (kData.creditAmount) {
+          updates.correctionCredits = (userData.correctionCredits || 0) + kData.creditAmount;
+          const creditsExpiry = new Date();
+          creditsExpiry.setDate(creditsExpiry.getDate() + 90); 
+          updates.creditsExpireAt = creditsExpiry.toISOString();
+          successDetail += (successDetail ? " + " : "") + `${kData.creditAmount} crédits IA`;
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return { success: false, message: "Données de clé invalides." };
+        }
+
+        transaction.update(keyRef, { 
+          isUsed: true, 
+          usedBy: user.id, 
+          usedAt: new Date().toISOString() 
+        });
+        transaction.update(userRef, updates);
+
+        return { success: true, message: `Activé : ${successDetail}` };
       });
     } catch (e) {
       handleFirestoreError(e, 'update', `accessKeys/${key}`);

@@ -9,6 +9,7 @@ export interface PlanPrice {
   durationDays: number;
   priceXAF: number;
   accessLevel: 'BASIC' | 'FULL';
+  creditAmount: number; // Integrated credits
 }
 
 export interface AccessKey {

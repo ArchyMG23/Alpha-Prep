@@ -84,64 +84,70 @@ export default function Store() {
       </div>
 
       {/* Plans Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 px-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-4">
         {filteredPrices.map(plan => (
-          <div key={plan.id} className="bg-white p-6 rounded-3xl border-2 border-slate-100 transition-all flex flex-col hover:border-indigo-200 hover:shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">{plan.durationDays} Jours</h3>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4">Accès {plan.accessLevel}</p>
-            <div className="text-2xl md:text-3xl font-black text-slate-900 mb-6">{plan.priceXAF.toLocaleString()} <span className="text-sm">FCFA</span></div>
+          <div key={plan.id} className="bg-white p-8 rounded-[40px] border-2 border-slate-100 transition-all flex flex-col hover:border-indigo-200 hover:shadow-2xl relative group overflow-hidden">
+            {plan.durationDays > 0 && (
+              <div className="absolute top-0 right-0 p-6">
+                <span className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black italic shadow-sm group-hover:scale-110 transition-transform">
+                  &alpha;
+                </span>
+              </div>
+            )}
             
-            <ul className="space-y-3 mb-8 flex-1">
-              <li className="flex items-start gap-2 text-xs font-medium text-slate-600"><Check size={14} className="text-emerald-500 shrink-0 mt-0.5" /> Accès {selectedTest}</li>
-              <li className="flex items-start gap-2 text-xs font-medium text-slate-600"><Check size={14} className="text-emerald-500 shrink-0 mt-0.5" /> {plan.accessLevel === 'FULL' ? 'Tous les exercices' : 'Exercices sélectionnés'}</li>
-              <li className="flex items-start gap-2 text-xs font-medium text-slate-600"><Check size={14} className="text-emerald-500 shrink-0 mt-0.5" /> Support WhatsApp 24/7</li>
-            </ul>
+            <h3 className="text-2xl font-black text-slate-900 mb-1">{plan.durationDays > 0 ? `${plan.durationDays} Jours` : "Pack Recharge"}</h3>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-6">Accès {plan.accessLevel}</p>
+            
+            <div className="mb-8">
+              <div className="text-4xl font-black text-slate-900 tracking-tighter">{plan.priceXAF.toLocaleString()} <span className="text-base font-bold ml-1">FCFA</span></div>
+            </div>
+            
+            <div className="space-y-4 mb-10 flex-1">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
+                  <Check size={18} />
+                </div>
+                <span className="text-sm font-bold text-slate-600">{plan.durationDays > 0 ? `Pass ${selectedTest} Complet` : "Usage Libre"}</span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 shrink-0">
+                  <Zap size={18} fill="currentColor" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-indigo-700">+{plan.creditAmount} Crédits IA</p>
+                  <p className="text-[10px] text-indigo-400 font-bold uppercase">Correction High-Precision</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
+                  <Globe size={18} />
+                </div>
+                <span className="text-sm font-bold text-slate-500">Support WhatsApp</span>
+              </div>
+            </div>
 
             <button 
-              onClick={() => handleWhatsAppOrder(`${plan.durationDays} Jours ${selectedTest}`, plan.priceXAF)}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 text-sm"
+              onClick={() => handleWhatsAppOrder(`${plan.durationDays > 0 ? plan.durationDays + ' Jours' : 'Pack Recharge'} ${selectedTest}`, plan.priceXAF)}
+              className="w-full py-5 bg-indigo-600 hover:bg-slate-900 text-white font-black rounded-2xl transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 group/btn text-base"
             >
-              <MessageSquare size={18} /> Commander
+              <MessageSquare size={20} className="group-hover/btn:scale-110 transition-transform" /> Commander via WhatsApp
             </button>
           </div>
         ))}
       </div>
 
-      {/* Credits Section */}
-      <div className="bg-white p-6 md:p-10 rounded-3xl border border-slate-200 shadow-sm mx-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 md:mb-10 gap-6">
-          <div>
-            <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-3">
-              <Zap className="text-indigo-500" fill="currentColor" /> Crédits IA High-Precision
-            </h2>
-            <p className="text-slate-500 mt-1 font-medium text-sm md:text-base">Corrections chirurgicales valables 30 jours pour TOUS les tests.</p>
-          </div>
-          <div className="flex items-center gap-3 text-xs md:text-sm font-black text-indigo-600 bg-indigo-50 px-5 py-2.5 rounded-full border border-indigo-100 w-fit">
-            <CreditCard size={18} /> Solde : {user.correctionCredits} crédits
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {[
-            { amount: 10, price: 5000, desc: "Pack Débutant" },
-            { amount: 30, price: 12000, desc: "Pack Intensif" },
-            { amount: 100, price: 35000, desc: "Pack Expert" },
-          ].map((pack) => (
-            <div key={pack.amount} className="p-6 md:p-8 rounded-3xl border-2 border-slate-100 hover:border-indigo-200 transition-all flex flex-col items-center text-center">
-              <div className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest">{pack.desc}</div>
-              <div className="text-4xl md:text-5xl font-black text-slate-900 mb-1 tracking-tighter">{pack.amount}</div>
-              <div className="text-slate-500 text-[10px] font-black mb-6 md:mb-8 uppercase tracking-widest">Crédits</div>
-              <div className="text-xl md:text-2xl font-black text-slate-900 mb-6 md:mb-8">{pack.price.toLocaleString()} FCFA</div>
-              
-              <button 
-                onClick={() => handleWhatsAppOrder(`Pack ${pack.amount} Crédits`, pack.price)}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 text-sm"
-              >
-                <MessageSquare size={18} /> Commander
-              </button>
-            </div>
-          ))}
-        </div>
+      {/* Info Section */}
+      <div className="bg-white p-8 md:p-12 rounded-[40px] border border-slate-200 shadow-sm mx-4 text-center">
+        <h2 className="text-2xl font-black text-slate-900 mb-4">Besoin d'un accompagnement personnalisé ?</h2>
+        <p className="text-slate-500 font-medium mb-10 max-w-2xl mx-auto">Nos experts sont disponibles pour vous guider dans votre préparation et répondre à toutes vos questions sur les tests TCF, TEF et IELTS.</p>
+        <button 
+          onClick={() => window.open('https://wa.me/237654491319', '_blank')}
+          className="px-10 py-5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 mx-auto"
+        >
+          Contacter un expert <ArrowRight size={20} />
+        </button>
       </div>
     </div>
   );
