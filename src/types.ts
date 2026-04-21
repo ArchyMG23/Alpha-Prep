@@ -62,6 +62,7 @@ export interface Question {
   correctAnswer?: string;
   methodologyContent?: string;
   sourceFile?: string; // Track original file name
+  createdAt: string;
 }
 
 export interface Attempt {

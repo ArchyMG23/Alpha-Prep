@@ -5,8 +5,9 @@ import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, S
 import { parseExamDocument } from '../services/geminiService';
 
 export default function AdminCMS() {
-  const { user, questions, prices, setPrices, generateAccessKey, accessKeys, saveQuestion, deleteQuestion } = useAppContext();
+  const { user, questions, prices, setPrices, savePrices, generateAccessKey, accessKeys, saveQuestion, deleteQuestion } = useAppContext();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isManagingPrices, setIsManagingPrices] = useState(false);
   const [isGeneratingKeys, setIsGeneratingKeys] = useState(false);
   const [keyType, setKeyType] = useState<'SUBSCRIPTION' | 'CREDITS'>('SUBSCRIPTION');
@@ -39,6 +40,7 @@ export default function AdminCMS() {
       requiredCredits: 1
     });
     setIsAdding(true);
+    setEditingId(null);
     setIsManagingPrices(false);
     setIsGeneratingKeys(false);
   };
@@ -123,7 +125,7 @@ export default function AdminCMS() {
   const handleSaveQuestion = async () => {
     if (!newQ.title || !newQ.content) return;
     const question: Question = {
-      id: `q_${Date.now()}`,
+      id: editingId || `q_${Date.now()}`,
       testType: newQ.testType as TestType,
       type: newQ.type as TaskType,
       level: newQ.level as Level,
@@ -133,12 +135,32 @@ export default function AdminCMS() {
       isFullAccessOnly: newQ.isFullAccessOnly || false,
       requiredCredits: newQ.requiredCredits || 0,
       sourceFile: newQ.sourceFile,
-      createdAt: new Date().toISOString()
+      createdAt: newQ.createdAt || new Date().toISOString()
     } as any;
     await saveQuestion(question);
     setIsAdding(false);
-    setSuccessMsg("Question ajoutée et sauvegardée !");
+    setEditingId(null);
+    setSuccessMsg(editingId ? "Modification enregistrée !" : "Question ajoutée et sauvegardée !");
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleEdit = (q: Question) => {
+    setNewQ({
+      testType: q.testType,
+      type: q.type,
+      level: q.level,
+      title: q.title,
+      content: q.content,
+      isPremium: q.isPremium,
+      isFullAccessOnly: q.isFullAccessOnly,
+      requiredCredits: q.requiredCredits,
+      sourceFile: q.sourceFile,
+      createdAt: q.createdAt
+    } as any);
+    setEditingId(q.id);
+    setIsAdding(true);
+    setIsManagingPrices(false);
+    setIsGeneratingKeys(false);
   };
 
   const handleUpdatePrice = (id: string, newPrice: number) => {
@@ -229,6 +251,18 @@ export default function AdminCMS() {
                 </div>
               </div>
             ))}
+          </div>
+          <div className="mt-10 flex justify-end">
+            <button 
+              onClick={async () => {
+                await savePrices(prices);
+                setSuccessMsg("Tarifs mis à jour avec succès !");
+                setTimeout(() => setSuccessMsg(''), 3000);
+              }}
+              className="px-10 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
+            >
+              <Save size={20} /> Sauvegarder les Tarifs
+            </button>
           </div>
         </div>
       )}
@@ -333,7 +367,7 @@ export default function AdminCMS() {
       {isAdding && (
         <div className="mx-4 md:mx-0 bg-white p-6 md:p-10 rounded-3xl border-2 border-indigo-100 shadow-2xl animate-in zoom-in-95">
           <div className="flex justify-between items-center mb-8 md:mb-10">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Ajouter une Simulation</h2>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{editingId ? 'Modifier la Simulation' : 'Ajouter une Simulation'}</h2>
             <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
           </div>
 
@@ -437,7 +471,7 @@ export default function AdminCMS() {
                 <td className="p-4 md:p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{q.type}</td>
                 <td className="p-4 md:p-6 text-right">
                   <div className="flex justify-end gap-2">
-                    <button className="p-2 text-slate-400 hover:text-indigo-600"><Edit2 size={16} /></button>
+                    <button onClick={() => handleEdit(q)} className="p-2 text-slate-400 hover:text-indigo-600"><Edit2 size={16} /></button>
                     <button onClick={() => deleteQuestion(q.id)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={16} /></button>
                   </div>
                 </td>

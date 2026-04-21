@@ -25,6 +25,7 @@ interface AppState {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setQuestions: React.Dispatch<React.SetStateAction<Question[]>>;
   setPrices: React.Dispatch<React.SetStateAction<PlanPrice[]>>;
+  savePrices: (newPrices: PlanPrice[]) => Promise<void>;
   addAttempt: (attempt: Attempt) => Promise<void>;
   deductCredit: (amount: number) => Promise<boolean>;
   addCredits: (amount: number) => Promise<void>;
@@ -257,6 +258,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (adminSnap.exists()) {
         setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
       }
+
+      // Load prices
+      const pricesSnap = await getDoc(doc(db, 'settings', 'prices'));
+      if (pricesSnap.exists()) {
+        setPrices((pricesSnap.data() as { list: PlanPrice[] }).list);
+      }
       
       // Ensure sample data exists
       await seedData();
@@ -266,6 +273,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     initApp();
   }, []);
+
+  const savePrices = async (newPrices: PlanPrice[]) => {
+    try {
+      await setDoc(doc(db, 'settings', 'prices'), { list: newPrices });
+      setPrices(newPrices);
+    } catch (e) {
+      handleFirestoreError(e, 'update', 'settings/prices');
+    }
+  };
 
   // 2. Real-time Questions Fetching (Always available)
   useEffect(() => {
@@ -538,6 +554,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser, 
       setQuestions, 
       setPrices,
+      savePrices,
       addAttempt, 
       deductCredit,
       addCredits,
