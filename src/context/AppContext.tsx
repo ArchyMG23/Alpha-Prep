@@ -59,34 +59,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [accessKeys, setAccessKeys] = useState<AccessKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Helper to seed sample data if empty
+  // Helper to seed sample data
   const seedData = async () => {
-    if (questions.length > 0) return;
-    
+    const nowStr = new Date().toISOString();
     const samples: Question[] = [
+      // === TCF CANADA (4 Subjects) ===
       {
         id: 'sample_tcf_oral_1',
         testType: 'TCF',
         type: 'LISTENING',
         level: 'B2',
         title: 'TCF Canada - Compréhension Orale - Tâche 1',
-        content: 'Écoutez l\'audio et répondez à la question.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\n\nQuestion: Quel est le sujet principal de la conversation ?',
+        content: 'Écoutez l\'audio et répondez à la question.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\n\nQuestion: Quel est le sujet principal de la conversation ?\nA) Un voyage d\'affaires\nB) Une visite familiale\nC) Un déménagement\nD) Une recherche d\'emploi',
         isPremium: true,
         isFullAccessOnly: false,
         requiredCredits: 0,
-        createdAt: new Date().toISOString()
+        createdAt: nowStr
       },
       {
-        id: 'sample_tef_writing_1',
-        testType: 'TEF',
+        id: 'sample_tcf_writing_1',
+        testType: 'TCF',
         type: 'WRITING',
         level: 'B2',
-        title: 'TEF Canada - Expression Écrite - Fait Divers',
-        content: 'Sujet: Vous avez lu cette annonce dans un journal. Écrivez un article pour raconter la suite de l\'histoire.\n\n"Un homme a trouvé un trésor dans son jardin hier matin..."',
+        title: 'TCF Canada - Expression Écrite - Tâche 1',
+        content: 'Vous voulez inviter un ami à une fête d\'anniversaire. \nÉcrivez-lui un message (60 à 120 mots) pour lui proposer de venir, en précisant la date, le lieu et le programme.',
         isPremium: true,
         isFullAccessOnly: false,
         requiredCredits: 1,
-        createdAt: new Date().toISOString()
+        createdAt: nowStr
+      },
+      {
+        id: 'sample_tcf_reading_1',
+        testType: 'TCF',
+        type: 'READING',
+        level: 'B2',
+        title: 'TCF Canada - Compréhension Écrite',
+        content: 'Lisez le texte suivant :\n"L\'éducation à distance a connu une croissance exponentielle ces dernières années. Bien que pratique, elle pose des défis en termes d\'interaction sociale."\n\nQuestion : Quel est le défi mentionné par l\'auteur ?',
+        isPremium: false,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: nowStr
       },
       {
         id: 'meth_tcf_writing',
@@ -95,10 +107,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         level: 'B2',
         title: 'TCF Canada - Méthodologie Expression Écrite',
         content: 'La Tâche 1 consiste à rédiger un message court. \nConseils:\n- Respectez le nombre de mots (60-120).\n- Utilisez des connecteurs logiques (Et, De plus, Enfin).\n- Soignez votre orthographe.',
+        methodologyContent: 'Points clés :\n1. Salutation appropriée.\n2. Corps de texte structuré.\n3. Formule de politesse.',
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 0,
-        createdAt: new Date().toISOString()
+        createdAt: nowStr
+      },
+
+      // === TEF CANADA (4 Subjects) ===
+      {
+        id: 'sample_tef_writing_1',
+        testType: 'TEF',
+        type: 'WRITING',
+        level: 'B2',
+        title: 'TEF Canada - Expression Écrite - Fait Divers',
+        content: 'Sujet: Vous avez lu cette annonce dans un journal. Écrivez un article pour raconter la suite de l\'histoire.\n\n"Un homme a trouvé un trésor dans son jardin hier matin..." (Minimum 80 mots)',
+        isPremium: true,
+        isFullAccessOnly: false,
+        requiredCredits: 1,
+        createdAt: nowStr
+      },
+      {
+        id: 'sample_tef_listening_1',
+        testType: 'TEF',
+        type: 'LISTENING',
+        level: 'B1',
+        title: 'TEF Canada - Compréhension Orale - Section A',
+        content: 'Écoutez attentivement ces messages courts.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3\n\nQuestion: Où se passe cette scène ?',
+        isPremium: true,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: nowStr
+      },
+      {
+        id: 'sample_tef_reading_1',
+        testType: 'TEF',
+        type: 'READING',
+        level: 'B2',
+        title: 'TEF Canada - Compréhension Écrite - Section B',
+        content: 'Sujet : Analyse d\'un article de presse sur l\'environnement.\nLe texte traite des nouvelles régulations sur le plastique en France.\n\nQuestion : Quelle est la principale mesure annoncée ?',
+        isPremium: false,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: nowStr
       },
       {
         id: 'meth_tef_writing',
@@ -107,10 +158,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         level: 'B2',
         title: 'TEF Canada - Méthodologie Fait Divers',
         content: 'La Section A demande de raconter la suite d\'un fait divers.\n- Utilisez le passé composé et l\'imparfait.\n- Structurez votre récit (début, péripéties, conclusion).\n- Soyez créatif mais cohérent.',
+        methodologyContent: 'Conseils pratiques :\n- Variez le vocabulaire (synonymes de "dire", "faire").\n- Vérifiez les accords grammaticaux.',
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 0,
-        createdAt: new Date().toISOString()
+        createdAt: nowStr
+      },
+
+      // === IELTS (4 Subjects) ===
+      {
+        id: 'sample_ielts_writing_1',
+        testType: 'IELTS',
+        type: 'WRITING',
+        level: 'C1',
+        title: 'IELTS Academic Writing - Task 2',
+        content: 'Topic: Some people believe that competitive sports are beneficial for children, while others think they can be harmful. Discuss both views and give your opinion.\n(Write at least 250 words)',
+        isPremium: true,
+        isFullAccessOnly: true,
+        requiredCredits: 1,
+        createdAt: nowStr
+      },
+      {
+        id: 'sample_ielts_listening_1',
+        testType: 'IELTS',
+        type: 'LISTENING',
+        level: 'B2',
+        title: 'IELTS Listening - Section 1',
+        content: 'A conversation between a customer and a travel insurance agent.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3\n\nQuestion: What is the customer\'s policy number?',
+        isPremium: true,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: nowStr
+      },
+      {
+        id: 'sample_ielts_reading_1',
+        testType: 'IELTS',
+        type: 'READING',
+        level: 'C1',
+        title: 'IELTS Reading - Passage 1',
+        content: 'Topic: The History of the Bicycle.\nScientific analysis of the evolution of transportation in the 19th century.\n\nQuestion: According to the text, who invented the first pedal-driven bicycle?',
+        isPremium: false,
+        isFullAccessOnly: false,
+        requiredCredits: 0,
+        createdAt: nowStr
       },
       {
         id: 'meth_ielts_writing',
@@ -119,10 +209,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         level: 'C1',
         title: 'IELTS Writing Task 2 - Essay Methodology',
         content: 'Structure recommendations:\n1. Introduction: Hook + Thesis statement.\n2. Body Paragraphs: One idea per paragraph with examples.\n3. Conclusion: Reiterate point without new info.',
+        methodologyContent: 'Rubric Criteria:\n- Task Response\n- Coherence and Cohesion\n- Lexical Resource\n- Grammatical Range and Accuracy',
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 0,
-        createdAt: new Date().toISOString()
+        createdAt: nowStr
       }
     ] as any;
 
@@ -130,12 +221,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, 'questions', s.id), s);
     }
   };
-
-  useEffect(() => {
-    if (!isLoading && questions.length === 0) {
-      seedData();
-    }
-  }, [isLoading, questions.length]);
 
   // 1. Local Device Identity & Profile Management
   useEffect(() => {
@@ -172,6 +257,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (adminSnap.exists()) {
         setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
       }
+      
+      // Ensure sample data exists
+      await seedData();
       
       setIsLoading(false);
     };
