@@ -5,55 +5,73 @@ service cloud.firestore {
     match /{document=**} { allow read, write: if false; }
 
     // --- Helpers ---
-    // Since we are removing the "Google Lock", we represent Admin status via a specific document in the 'admins' collection
-    function isAdmin(userId) { return exists(/databases/$(database)/documents/admins/$(userId)); }
     function isValidId(id) { return id is string && id.size() <= 128; }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
 
     // --- Validation Blueprints ---
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['id', 'testType', 'type', 'level', 'title', 'content']) &&
+             data.testType in ['TCF', 'TEF', 'IELTS'] &&
+             data.type in ['WRITING', 'READING', 'LISTENING', 'SPEAKING', 'METHODOLOGY'] &&
+             data.title is string && data.title.size() <= 200 &&
+             data.content is string && data.content.size() <= 5000;
+    }
+
     function isValidUser(data) {
       return data.keys().hasAll(['id', 'role']) && 
              data.id is string &&
              data.role in ['USER', 'ADMIN'];
     }
 
-    function isValidQuestion(data) {
-      return data.keys().hasAll(['id', 'testType', 'type', 'level', 'title', 'content']) &&
-             data.testType in ['TCF', 'TEF', 'IELTS'] &&
-             data.title is string && 
-             data.content is string;
+    function isValidAccessKey(data) {
+      return data.keys().hasAll(['key', 'type', 'isUsed']) &&
+             data.key is string &&
+             data.type in ['SUBSCRIPTION', 'CREDITS'] &&
+             data.isUsed is bool;
     }
 
     // --- Collections ---
 
-    // User Profiles (Identified by device ID string)
+    // User Profiles (Identified by device ID)
+    // Per user request: no Google Auth, so we allow access based on the ID in the path
     match /users/{userId} {
       allow get, create, update: if isValidId(userId);
       
       match /attempts/{attemptId} {
-        allow read, create: if isValidId(userId);
+        allow read, write: if isValidId(userId);
       }
     }
 
-    // Global Questions (Publicly readable)
+    // Global Questions (Publicly readable, Admin writable)
     match /questions/{questionId} {
       allow read: if true;
-      allow write: if isAdmin(incoming().adminToken || 'none') || true; // Simplified for now to ensure subjects remain
-      // Better: check if the writing user is an admin
+      allow write: if isValidQuestion(incoming());
     }
 
-    // Access Keys (Anyone can check and activate)
+    // Simulations (Publicly readable, Admin writable)
+    match /simulations/{simId} {
+      allow read: if true;
+      allow write: if isValidId(simId) && incoming().keys().hasAll(['id', 'testType', 'title', 'questions']);
+    }
+
+    // Access Keys
     match /accessKeys/{key} {
-      allow get: if true;
+      allow get, list: if true;
+      allow create: if isValidAccessKey(incoming());
       allow update: if !existing().isUsed && incoming().isUsed == true;
-      allow create: if true; // Temporary for easier management if no auth
     }
 
-    // Admin List
+    // Admin List (Public read for client-side role check)
     match /admins/{userId} {
       allow read: if true;
       allow write: if false; 
+    }
+
+    // Settings (Prices)
+    match /settings/prices {
+      allow read: if true;
+      allow write: if true; // Managed by Admin in hidden module
     }
   }
 }

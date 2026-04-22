@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Question, Attempt, TestType, Subscription, PlanPrice, AccessKey } from '../types';
+import { User, Question, Attempt, TestType, Subscription, PlanPrice, AccessKey, Simulation } from '../types';
 import { auth, db, handleFirestoreError } from '../lib/firebase';
 import { 
   onSnapshot, 
@@ -8,6 +8,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   query, 
   where,
   serverTimestamp,
@@ -18,6 +19,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 interface AppState {
   user: User | null;
   questions: Question[];
+  simulations: Simulation[];
   attempts: Attempt[];
   prices: PlanPrice[];
   accessKeys: AccessKey[];
@@ -32,6 +34,8 @@ interface AppState {
   addSubscription: (sub: Subscription) => Promise<void>;
   saveQuestion: (question: Question) => Promise<void>;
   deleteQuestion: (id: string) => Promise<void>;
+  saveSimulation: (simulation: Simulation) => Promise<void>;
+  deleteSimulation: (id: string) => Promise<void>;
   generateAccessKey: (params: {
     type: 'SUBSCRIPTION' | 'CREDITS';
     test?: TestType;
@@ -55,6 +59,7 @@ const AppContext = createContext<AppState | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [simulations, setSimulations] = useState<Simulation[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [prices, setPrices] = useState<PlanPrice[]>(initialPrices);
   const [accessKeys, setAccessKeys] = useState<AccessKey[]>([]);
@@ -63,6 +68,159 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Helper to seed sample data
   const seedData = async () => {
     const nowStr = new Date().toISOString();
+    
+    // Helper to create a TCF Canada Complete Simulation
+    const tcfSim: Simulation = {
+      id: 'sim_tcf_full_1',
+      testType: 'TCF',
+      title: 'Simulation Complète TCF Canada - Session 1',
+      description: 'Épreuve complète incluant Compréhension Orale, Écrite et Expression Écrite.',
+      level: 'B2',
+      isPremium: true,
+      requiredCredits: 2,
+      createdAt: nowStr,
+      questions: [
+        {
+          id: 'q_tcf_oral_sim1_1',
+          testType: 'TCF',
+          type: 'LISTENING',
+          level: 'B2',
+          title: 'Partie 1: Compréhension Orale',
+          content: 'Écoutez l\'audio et répondez à la question.\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\nQuestion: Où se passe cette conversation ?',
+          options: [
+            { id: 'a', text: 'Dans une banque', isCorrect: true },
+            { id: 'b', text: 'Au marché', isCorrect: false },
+            { id: 'c', text: 'À l\'école', isCorrect: false }
+          ],
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        },
+        {
+          id: 'q_tcf_read_sim1_1',
+          testType: 'TCF',
+          type: 'READING',
+          level: 'B2',
+          title: 'Partie 2: Compréhension Écrite',
+          content: 'Lisez le texte sur l\'immigration au Canada.\n"Le Canada cherche à attirer 500,000 nouveaux résidents d\'ici 2025."\nQuestion: Quel est l\'objectif cité ?',
+          options: [
+            { id: 'a', text: 'Réduire l\'immigration', isCorrect: false },
+            { id: 'b', text: 'Augmenter le nombre de résidents', isCorrect: true },
+            { id: 'c', text: 'Fermer les frontières', isCorrect: false }
+          ],
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        },
+        {
+          id: 'q_tcf_write_sim1_1',
+          testType: 'TCF',
+          type: 'WRITING',
+          level: 'B2',
+          title: 'Partie 3: Expression Écrite',
+          content: 'Sujet 1: Vous écrivez à un ami pour lui raconter vos vacances au Québec. (60-120 mots)',
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        }
+      ]
+    };
+
+    // Helper to create a TEF Canada Complete Simulation
+    const tefSim: Simulation = {
+      id: 'sim_tef_full_1',
+      testType: 'TEF',
+      title: 'Simulation Complète TEF Canada - Session 1',
+      description: 'Session intensive du TEF Canada. Tous les modules inclus.',
+      level: 'B2',
+      isPremium: true,
+      requiredCredits: 2,
+      createdAt: nowStr,
+      questions: [
+        {
+          id: 'q_tef_oral_sim1_1',
+          testType: 'TEF',
+          type: 'LISTENING',
+          level: 'B2',
+          title: 'Section A: Compréhension Orale',
+          content: 'Audio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3\nQuestion: Quelle est l\'intention du locuteur ?',
+          options: [
+            { id: 'a', text: 'Informer', isCorrect: true },
+            { id: 'b', text: 'Se plaindre', isCorrect: false },
+            { id: 'c', text: 'Vendre un produit', isCorrect: false }
+          ],
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        },
+        {
+          id: 'q_tef_write_sim1_1',
+          testType: 'TEF',
+          type: 'WRITING',
+          level: 'B2',
+          title: 'Section B: Expression Écrite',
+          content: 'Fait divers: Une baleine a été aperçue dans la Seine. Racontez la suite. (80-120 mots)',
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        }
+      ]
+    };
+
+    // Helper to create an IELTS Complete Simulation
+    const ieltsSim: Simulation = {
+      id: 'sim_ielts_full_1',
+      testType: 'IELTS',
+      title: 'IELTS Real-Condition Mock Test - Session 1',
+      description: 'A full IELTS academic mock test covering Listening, Reading, and Writing tasks.',
+      level: 'C1',
+      isPremium: true,
+      requiredCredits: 2,
+      createdAt: nowStr,
+      questions: [
+        {
+          id: 'q_ielts_oral_sim1_1',
+          testType: 'IELTS',
+          type: 'LISTENING',
+          level: 'C1',
+          title: 'Listening Section 1',
+          content: 'Audio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3\nQuestion: What is the speaker\'s primary concern?',
+          options: [
+            { id: 'a', text: 'Global warming', isCorrect: true },
+            { id: 'b', text: 'Economic crisis', isCorrect: false },
+            { id: 'c', text: 'Space exploration', isCorrect: false }
+          ],
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        },
+        {
+          id: 'q_ielts_write_sim1_1',
+          testType: 'IELTS',
+          type: 'WRITING',
+          level: 'C1',
+          title: 'Writing Task 2',
+          content: 'Topic: Should technology be used in classrooms? Discuss. (250 words minimum)',
+          isPremium: true,
+          isFullAccessOnly: false,
+          requiredCredits: 0,
+          createdAt: nowStr
+        }
+      ]
+    };
+
+    // Save simulations
+    const sims = [tcfSim, tefSim, ieltsSim];
+    for (const sim of sims) {
+      await setDoc(doc(db, 'simulations', sim.id), sim);
+    }
+
     const samples: Question[] = [
       // === TCF CANADA (4 Subjects) ===
       {
@@ -71,7 +229,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: 'LISTENING',
         level: 'B2',
         title: 'TCF Canada - Compréhension Orale - Tâche 1',
-        content: 'Écoutez l\'audio et répondez à la question.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\n\nQuestion: Quel est le sujet principal de la conversation ?\nA) Un voyage d\'affaires\nB) Une visite familiale\nC) Un déménagement\nD) Une recherche d\'emploi',
+        content: 'Écoutez l\'audio et répondez à la question.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\n\nQuestion: Quel est le sujet principal de la conversation ?',
+        options: [
+          { id: 'a', text: 'Un voyage d\'affaires', isCorrect: false },
+          { id: 'b', text: 'Une visite familiale', isCorrect: true },
+          { id: 'c', text: 'Un déménagement', isCorrect: false },
+          { id: 'd', text: 'Une recherche d\'emploi', isCorrect: false }
+        ],
         isPremium: true,
         isFullAccessOnly: false,
         requiredCredits: 0,
@@ -95,7 +259,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: 'READING',
         level: 'B2',
         title: 'TCF Canada - Compréhension Écrite',
-        content: 'Lisez le texte suivant :\n"L\'éducation à distance a connu une croissance exponentielle ces dernières années. Bien que pratique, elle pose des défis en termes d\'interaction sociale."\n\nQuestion : Quel est le défi mentionné par l\'auteur ?',
+        content: 'Lisez le texte suivant :\n"L\'éducation à distance a connu une croissance exponentielle ces dernières années. Bien que pratique, elle pose des défis en termes d\'interaction sociale."',
+        options: [
+          { id: 'a', text: 'Le manque de matériel informatique', isCorrect: false },
+          { id: 'b', text: 'L\'interaction sociale limitée', isCorrect: true },
+          { id: 'c', text: 'Le coût trop élevé', isCorrect: false },
+          { id: 'd', text: 'La difficulté des examens', isCorrect: false }
+        ],
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 0,
@@ -134,7 +304,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: 'LISTENING',
         level: 'B1',
         title: 'TEF Canada - Compréhension Orale - Section A',
-        content: 'Écoutez attentivement ces messages courts.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3\n\nQuestion: Où se passe cette scène ?',
+        content: 'Écoutez attentivement ces messages courts.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+        options: [
+          { id: 'a', text: 'Dans une gare', isCorrect: true },
+          { id: 'b', text: 'Dans un aéroport', isCorrect: false },
+          { id: 'c', text: 'Dans un restaurant', isCorrect: false },
+          { id: 'd', text: 'Dans une bibliothèque', isCorrect: false }
+        ],
         isPremium: true,
         isFullAccessOnly: false,
         requiredCredits: 0,
@@ -146,7 +322,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: 'READING',
         level: 'B2',
         title: 'TEF Canada - Compréhension Écrite - Section B',
-        content: 'Sujet : Analyse d\'un article de presse sur l\'environnement.\nLe texte traite des nouvelles régulations sur le plastique en France.\n\nQuestion : Quelle est la principale mesure annoncée ?',
+        content: 'Sujet : Analyse d\'un article de presse sur l\'environnement.\nLe texte traite des nouvelles régulations sur le plastique en France.',
+        options: [
+          { id: 'a', text: 'L\'interdiction totale du plastique', isCorrect: false },
+          { id: 'b', text: 'Une taxe sur les bouteilles', isCorrect: false },
+          { id: 'c', text: 'La fin des emballages jetables pour fruits et légumes', isCorrect: true },
+          { id: 'd', text: 'La fermeture des usines de plastique', isCorrect: false }
+        ],
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 0,
@@ -185,7 +367,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: 'LISTENING',
         level: 'B2',
         title: 'IELTS Listening - Section 1',
-        content: 'A conversation between a customer and a travel insurance agent.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3\n\nQuestion: What is the customer\'s policy number?',
+        content: 'A conversation between a customer and a travel insurance agent.\n\nAudio: https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+        options: [
+          { id: 'a', text: 'AB12345', isCorrect: false },
+          { id: 'b', text: 'XY98765', isCorrect: true },
+          { id: 'c', text: 'ZZ00001', isCorrect: false },
+          { id: 'd', text: 'KL55667', isCorrect: false }
+        ],
         isPremium: true,
         isFullAccessOnly: false,
         requiredCredits: 0,
@@ -197,7 +385,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: 'READING',
         level: 'C1',
         title: 'IELTS Reading - Passage 1',
-        content: 'Topic: The History of the Bicycle.\nScientific analysis of the evolution of transportation in the 19th century.\n\nQuestion: According to the text, who invented the first pedal-driven bicycle?',
+        content: 'Topic: The History of the Bicycle.\nScientific analysis of the evolution of transportation in the 19th century.',
+        options: [
+          { id: 'a', text: 'Karl von Drais', isCorrect: true },
+          { id: 'b', text: 'James Starley', isCorrect: false },
+          { id: 'c', text: 'Pierre Michaux', isCorrect: false },
+          { id: 'd', text: 'John Kemp Starley', isCorrect: false }
+        ],
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 0,
@@ -298,6 +492,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // 2.5 Real-time Simulations Fetching
+  useEffect(() => {
+    const q = query(collection(db, 'simulations'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const sData = snapshot.docs
+        .map(doc => doc.data() as Simulation)
+        .filter(s => (s as any).isDeleted !== true);
+      setSimulations(sData);
+    }, (error) => {
+      console.warn("Firestore Simulations Listener Error:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // 3. Real-time Access Keys (Admins only)
   useEffect(() => {
     if (user?.role !== 'ADMIN') {
@@ -337,17 +545,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const attemptRef = doc(collection(db, 'users', user.id, 'attempts'), attempt.id);
       await setDoc(attemptRef, attempt);
       
+      // Calculate new average from last 20 attempts
+      const allAttempts = [attempt, ...attempts];
+      const recentAttempts = allAttempts.slice(0, 20);
+      const totalScore = recentAttempts.reduce((sum, a) => sum + a.scoreCLB, 0);
+      const newAverage = totalScore / recentAttempts.length;
+      
       // Update global user stats locally and on server
       const userRef = doc(db, 'users', user.id);
-      const newAverage = Math.min(10, user.averageCLB + 0.1);
-      const newCRS = Math.min(600, user.estimatedCRS + 5);
+      // CRS formula approximation: 400 + (CLB-7)*40
+      const newCRS = Math.max(0, Math.min(600, 400 + (newAverage - 7) * 50));
       
       await updateDoc(userRef, {
-        averageCLB: newAverage,
-        estimatedCRS: newCRS
+        averageCLB: parseFloat(newAverage.toFixed(1)),
+        estimatedCRS: Math.round(newCRS)
       });
-      
-      setAttempts(prev => [attempt, ...prev]);
     } catch (e) {
       handleFirestoreError(e, 'create', `users/${user.id}/attempts/${attempt.id}`);
     }
@@ -426,6 +638,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // await deleteDoc(doc(db, 'questions', id));
     } catch (e) {
       handleFirestoreError(e, 'delete', `questions/${id}`);
+    }
+  };
+
+  const saveSimulation = async (simulation: Simulation) => {
+    try {
+      await setDoc(doc(db, 'simulations', simulation.id), simulation);
+    } catch (e) {
+      handleFirestoreError(e, 'create', `simulations/${simulation.id}`);
+    }
+  };
+
+  const deleteSimulation = async (id: string) => {
+    try {
+      await setDoc(doc(db, 'simulations', id), { isDeleted: true }, { merge: true });
+    } catch (e) {
+      handleFirestoreError(e, 'delete', `simulations/${id}`);
     }
   };
 
@@ -547,6 +775,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{ 
       user, 
       questions, 
+      simulations,
       attempts, 
       prices,
       accessKeys,
@@ -561,6 +790,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addSubscription,
       saveQuestion,
       deleteQuestion,
+      saveSimulation,
+      deleteSimulation,
       generateAccessKey,
       useAccessKey
     }}>

@@ -82,6 +82,7 @@
     "/questions/{questionId}": { "schema": "Question", "description": "Global test questions" },
     "/accessKeys/{key}": { "schema": "AccessKey", "description": "Access codes" },
     "/users/{userId}/attempts/{attemptId}": { "schema": "Attempt", "description": "User specific attempts" },
-    "/admins/{userId}": { "schema": { "type": "object", "properties": { "id": { "type": "string" } } }, "description": "Admin list" }
+    "/admins/{userId}": { "schema": { "type": "object", "properties": { "id": { "type": "string" } } }, "description": "Admin list" },
+    "/settings/prices": { "schema": { "type": "object", "properties": { "list": { "type": "array" } } }, "description": "Plan prices" }
   }
 }

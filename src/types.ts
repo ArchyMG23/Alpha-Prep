@@ -65,6 +65,18 @@ export interface Question {
   createdAt: string;
 }
 
+export interface Simulation {
+  id: string;
+  testType: TestType;
+  title: string;
+  description: string;
+  level: Level;
+  questions: Question[]; // Nested questions for simplicity in this flow, or group them
+  isPremium: boolean;
+  requiredCredits: number;
+  createdAt: string;
+}
+
 export interface Attempt {
   id: string;
   userId: string;
