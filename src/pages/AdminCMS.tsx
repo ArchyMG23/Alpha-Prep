@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Question, TaskType, Level, TestType, PlanPrice, Simulation } from '../types';
-import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, Settings, Lock, ShieldCheck, Save, MessageSquare, CheckCircle2, GraduationCap, List, ArrowRight, Sparkles } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, Settings, Lock, ShieldCheck, Save, MessageSquare, CheckCircle2, GraduationCap, List, ArrowRight, Sparkles, Headphones, PenTool, BookOpen } from 'lucide-react';
 import { parseExamDocument } from '../services/geminiService';
 
 export default function AdminCMS() {
