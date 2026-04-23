@@ -40,12 +40,42 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
     }
   };
 
+  const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
+
+  React.useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (isLoading) {
+      timeout = setTimeout(() => {
+        setShowTimeoutMessage(true);
+      }, 10000); // 10 seconds
+    }
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
+
   if (isLoading) {
     return (
       <div className="flex h-dvh items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin text-indigo-600" size={40} />
-          <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Chargement Alpha Prep...</p>
+        <div className="flex flex-col items-center gap-4 p-8 text-center">
+          <Loader2 className="animate-spin text-indigo-600 mb-2" size={40} />
+          <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Chargement Alpha Prep...</p>
+          
+          {showTimeoutMessage && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-3xl max-w-xs"
+            >
+              <p className="text-amber-800 text-xs font-bold leading-relaxed">
+                Le chargement semble lent. Cela peut être dû à votre connexion internet ou à des restrictions réseau locales.
+              </p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-4 px-6 py-2 bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-amber-300 transition-colors"
+              >
+                Réessayer
+              </button>
+            </motion.div>
+          )}
         </div>
       </div>
     );

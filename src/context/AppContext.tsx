@@ -420,49 +420,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 1. Local Device Identity & Profile Management
   useEffect(() => {
     const initApp = async () => {
-      let localId = localStorage.getItem('alpha_prep_user_id');
-      if (!localId) {
-        localId = 'user_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('alpha_prep_user_id', localId);
-      }
+      try {
+        let localId = localStorage.getItem('alpha_prep_user_id');
+        if (!localId) {
+          localId = 'user_' + Math.random().toString(36).substring(2, 15);
+          localStorage.setItem('alpha_prep_user_id', localId);
+        }
 
-      const userRef = doc(db, 'users', localId);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        setUser(userSnap.data() as User);
-      } else {
-        // Create initial profile linked to this device
-        const newUser: User = {
-          id: localId,
-          name: 'Étudiant ' + localId.substring(5, 9).toUpperCase(),
-          email: 'anonymous@device.local',
-          role: 'USER',
-          subscriptions: [],
-          correctionCredits: 0,
-          estimatedCRS: 0,
-          averageCLB: 0
-        };
-        await setDoc(userRef, newUser);
-        setUser(newUser);
-      }
+        const userRef = doc(db, 'users', localId);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          setUser(userSnap.data() as User);
+        } else {
+          // Create initial profile linked to this device
+          const newUser: User = {
+            id: localId,
+            name: 'Étudiant ' + localId.substring(5, 9).toUpperCase(),
+            email: 'anonymous@device.local',
+            role: 'USER',
+            subscriptions: [],
+            correctionCredits: 0,
+            estimatedCRS: 0,
+            averageCLB: 0
+          };
+          await setDoc(userRef, newUser);
+          setUser(newUser);
+        }
 
-      // Check if this specific device ID is granted admin status
-      const adminSnap = await getDoc(doc(db, 'admins', localId));
-      if (adminSnap.exists()) {
-        setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
-      }
+        // Check if this specific device ID is granted admin status
+        const adminSnap = await getDoc(doc(db, 'admins', localId));
+        if (adminSnap.exists()) {
+          setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
+        }
 
-      // Load prices
-      const pricesSnap = await getDoc(doc(db, 'settings', 'prices'));
-      if (pricesSnap.exists()) {
-        setPrices((pricesSnap.data() as { list: PlanPrice[] }).list);
+        // Load prices (try-catch specifically for this as it's non-critical)
+        try {
+          const pricesSnap = await getDoc(doc(db, 'settings', 'prices'));
+          if (pricesSnap.exists()) {
+            setPrices((pricesSnap.data() as { list: PlanPrice[] }).list);
+          }
+        } catch (e) {
+          console.warn("Failed to load prices:", e);
+        }
+        
+        // Seed data in background to avoid blocking the UI
+        seedData().catch(e => console.warn("Seed data deferred error:", e));
+        
+        setIsLoading(false);
+      } catch (e) {
+        console.error("Critical Init Error:", e);
+        // Ensure we at least stop loading even on error, and show whatever we can
+        setIsLoading(false);
       }
-      
-      // Ensure sample data exists
-      await seedData();
-      
-      setIsLoading(false);
     };
 
     initApp();
