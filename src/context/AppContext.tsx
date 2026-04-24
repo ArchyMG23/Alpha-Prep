@@ -421,10 +421,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initApp = async () => {
       try {
-        let localId = localStorage.getItem('alpha_prep_user_id');
+        let localId: string | null = null;
+        try {
+          localId = localStorage.getItem('alpha_prep_user_id');
+        } catch (e) {
+          console.warn("localStorage is not accessible:", e);
+        }
+
         if (!localId) {
           localId = 'user_' + Math.random().toString(36).substring(2, 15);
-          localStorage.setItem('alpha_prep_user_id', localId);
+          try {
+            localStorage.setItem('alpha_prep_user_id', localId);
+          } catch (e) {
+            console.warn("Could not save to localStorage:", e);
+          }
         }
 
         const userRef = doc(db, 'users', localId);
