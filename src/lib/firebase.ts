@@ -1,13 +1,38 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, getDocs, onSnapshot, where, addDoc, serverTimestamp, writeBatch, getDocFromServer } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  getDocs, 
+  onSnapshot, 
+  where, 
+  addDoc, 
+  serverTimestamp, 
+  writeBatch, 
+  getDocFromServer 
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Use the database ID from config for Enterprise edition
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with persistent cache and experimental forceLongPolling
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  }),
+  experimentalForceLongPolling: true
+}, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth(app);
+// Use memory persistence for auth if needed, but standard is fine
+// auth.useDeviceLanguage();
 export const googleProvider = new GoogleAuthProvider();
 
 // Connection test as required by directives

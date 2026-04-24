@@ -63,16 +63,24 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-3xl max-w-xs"
+              className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-3xl max-w-sm"
             >
-              <p className="text-amber-800 text-xs font-bold leading-relaxed">
-                Le chargement semble lent. Cela peut être dû à votre connexion internet ou à des restrictions réseau locales.
+              <h4 className="text-amber-900 font-black text-xs uppercase tracking-widest mb-2">Problème de connexion détecté</h4>
+              <p className="text-amber-800 text-[10px] font-bold leading-relaxed space-y-2">
+                <span>Le chargement est anormalement lent. Cela arrive souvent sur les réseaux Orange/MTN au Cameroun.</span>
+                <br /><br />
+                <strong>Solutions suggérées :</strong>
+                <ul className="list-disc ml-4 mt-1">
+                  <li>Activez/Désactivez le mode Avion</li>
+                  <li>Utilisez un DNS public (8.8.8.8)</li>
+                  <li>Essayez via un VPN si possible</li>
+                </ul>
               </p>
               <button 
                 onClick={() => window.location.reload()}
-                className="mt-4 px-6 py-2 bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-amber-300 transition-colors"
+                className="mt-4 w-full px-6 py-3 bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-amber-300 transition-colors"
               >
-                Réessayer
+                Réessayer la connexion
               </button>
             </motion.div>
           )}

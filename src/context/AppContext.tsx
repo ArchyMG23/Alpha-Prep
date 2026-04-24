@@ -420,6 +420,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 1. Local Device Identity & Profile Management
   useEffect(() => {
     const initApp = async () => {
+      // Set a safety timeout for the entire initialization
+      const safetyTimeout = setTimeout(() => {
+        if (isLoading) {
+          console.warn("Initialization taking too long, forcing UI ready state.");
+          setIsLoading(false);
+          // We don't return here so the async calls below can still finish if they ever do
+        }
+      }, 15000); // 15s absolute limit for first render
+
       try {
         let localId: string | null = null;
         try {
@@ -477,8 +486,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Seed data in background to avoid blocking the UI
         seedData().catch(e => console.warn("Seed data deferred error:", e));
         
+        clearTimeout(safetyTimeout);
         setIsLoading(false);
       } catch (e) {
+        clearTimeout(safetyTimeout);
         console.error("Critical Init Error:", e);
         // Ensure we at least stop loading even on error, and show whatever we can
         setIsLoading(false);
