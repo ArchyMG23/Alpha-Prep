@@ -218,7 +218,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Save simulations
     const sims = [tcfSim, tefSim, ieltsSim];
     for (const sim of sims) {
-      await setDoc(doc(db, 'simulations', sim.id), sim);
+      await setDoc(doc(db, 'simulations', sim.id), removeUndefined(sim));
     }
 
     const samples: Question[] = [
@@ -413,7 +413,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ] as any;
 
     for (const s of samples) {
-      await setDoc(doc(db, 'questions', s.id), s);
+      await setDoc(doc(db, 'questions', s.id), removeUndefined(s));
     }
   };
 
@@ -424,6 +424,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const safetyTimeout = setTimeout(() => {
         if (isLoading) {
           console.warn("Initialization taking too long, forcing UI ready state.");
+          
+          const fallbackId = localStorage.getItem('alpha_prep_user_id') || 'user_offline_' + Math.random().toString(36).substring(2, 15);
+          setUser({
+            id: fallbackId,
+            name: 'Étudiant Bêta (Offline)',
+            email: 'anonymous@device.local',
+            role: localStorage.getItem('alpha_admin_override') === 'true' ? 'ADMIN' : 'USER',
+            subscriptions: [],
+            correctionCredits: 0,
+            estimatedCRS: 0,
+            averageCLB: 0
+          });
+
           setIsLoading(false);
           // We don't return here so the async calls below can still finish if they ever do
         }
@@ -449,11 +462,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const userRef = doc(db, 'users', localId);
         const userSnap = await getDoc(userRef);
         
+        let userObj: User | null = null;
         if (userSnap.exists()) {
-          setUser(userSnap.data() as User);
+          userObj = userSnap.data() as User;
         } else {
           // Create initial profile linked to this device
-          const newUser: User = {
+          userObj = {
             id: localId,
             name: 'Étudiant ' + localId.substring(5, 9).toUpperCase(),
             email: 'anonymous@device.local',
@@ -463,14 +477,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             estimatedCRS: 0,
             averageCLB: 0
           };
-          await setDoc(userRef, newUser);
-          setUser(newUser);
+          try {
+            await setDoc(userRef, userObj);
+          } catch (e) {
+            console.warn("Could not save initial user to Firebase (offline?)", e);
+          }
         }
+        setUser(userObj);
 
         // Check if this specific device ID is granted admin status
-        const adminSnap = await getDoc(doc(db, 'admins', localId));
-        if (adminSnap.exists()) {
-          setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
+        try {
+          const adminSnap = await getDoc(doc(db, 'admins', localId));
+          if (adminSnap.exists()) {
+            setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
+          }
+        } catch (e) {
+          console.warn("Could not fetch admin status (offline?)", e);
+          // If code is specifically standard admin fallback:
+          if (localStorage.getItem('alpha_admin_override') === 'true') {
+             setUser(prev => prev ? { ...prev, role: 'ADMIN' } : null);
+          }
         }
 
         // Load prices (try-catch specifically for this as it's non-critical)
@@ -499,9 +525,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     initApp();
   }, []);
 
+  const removeUndefined = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(removeUndefined);
+    
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, removeUndefined(v)])
+    );
+  };
+
   const savePrices = async (newPrices: PlanPrice[]) => {
     try {
-      await setDoc(doc(db, 'settings', 'prices'), { list: newPrices });
+      await setDoc(doc(db, 'settings', 'prices'), { list: removeUndefined(newPrices) });
       setPrices(newPrices);
     } catch (e) {
       handleFirestoreError(e, 'update', 'settings/prices');
@@ -574,7 +611,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const attemptRef = doc(collection(db, 'users', user.id, 'attempts'), attempt.id);
-      await setDoc(attemptRef, attempt);
+      await setDoc(attemptRef, removeUndefined(attempt));
       
       // Calculate new average from last 20 attempts
       const allAttempts = [attempt, ...attempts];
@@ -656,7 +693,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveQuestion = async (question: Question) => {
     try {
-      await setDoc(doc(db, 'questions', question.id), question);
+      await setDoc(doc(db, 'questions', question.id), removeUndefined(question));
     } catch (e) {
       handleFirestoreError(e, 'create', `questions/${question.id}`);
     }
@@ -674,7 +711,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveSimulation = async (simulation: Simulation) => {
     try {
-      await setDoc(doc(db, 'simulations', simulation.id), simulation);
+      await setDoc(doc(db, 'simulations', simulation.id), removeUndefined(simulation));
     } catch (e) {
       handleFirestoreError(e, 'create', `simulations/${simulation.id}`);
     }
@@ -713,7 +750,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
-      await setDoc(doc(db, 'accessKeys', key), keyData);
+      await setDoc(doc(db, 'accessKeys', key), removeUndefined(keyData));
       return key;
     } catch (e) {
       handleFirestoreError(e, 'create', `accessKeys/${key}`);

@@ -36,7 +36,7 @@ export async function parseExamDocument(fileData: string, mimeType: string, file
 
   let contentPart;
   if (isText) {
-    // If it's data url from FileReader.readAsDataURL for a text file
+    // ... handling text file content ...
     let rawText = fileData;
     if (fileData.startsWith('data:')) {
       try {
@@ -91,5 +91,66 @@ export async function parseExamDocument(fileData: string, mimeType: string, file
   } catch (error) {
     console.error("Gemini Parsing Error Details:", error);
     throw error; // Throw so UI can see 
+  }
+}
+
+export async function gradeWritingTask(questionContent: string, userAnswer: string, testType: TestType, keywords?: string[]): Promise<{ scoreCLB: number; feedback: string }> {
+  const ai = getAI();
+  
+  const prompt = `You are an expert examiner for the ${testType} exam (specifically TCF/TEF Canada or IELTS). 
+  Please evaluate the candidate's response based on official criteria:
+  
+  For TCF/TEF:
+  - Respect de la consigne (60-120 words for task 1, 120-150 for task 2, 120-180 for task 3).
+  - Cohérence et cohésion (logical connectors).
+  - Lexique (richness and precision).
+  - Grammaire (complex structures, accuracy).
+  
+  For IELTS:
+  - Task Response, Coherence/Cohesion, Lexical Resource, Grammatical Range/Accuracy.
+  
+  ${keywords && keywords.length > 0 ? `Important keywords/concepts to check: ${keywords.join(', ')}.` : ''}
+  ${questionContent.includes("CONTEXTE_GENERATION_EXAMEN") ? "IMPORTANT: Generate a JSON practice exercise." : ""}
+
+  EXAM TASK:
+  ${questionContent}
+  
+  CANDIDATE'S WORK:
+  ${userAnswer === 'CONTEXTE_GENERATION_EXAMEN' ? 'N/A' : userAnswer}
+  
+  Evaluate and provide a feedback in French. Return the result as JSON.
+  If testType is TCF/TEF, scoreCLB is NCLC level (3 to 12).
+  If testType is IELTS, scoreCLB is Band score equivalent (0-9).
+  
+  JSON Structure:
+  {
+    "scoreCLB": number,
+    "feedback": "Feedback détaillé en français..."
+  }`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            scoreCLB: { type: Type.NUMBER, description: "NCLC level from 1 to 12" },
+            feedback: { type: Type.STRING, description: "Detailed examiner feedback" }
+          },
+          required: ['scoreCLB', 'feedback']
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No response from AI");
+    
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini Grading Error Details:", error);
+    throw error;
   }
 }

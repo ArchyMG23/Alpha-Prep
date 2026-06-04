@@ -54,12 +54,21 @@ export interface Question {
   type: TaskType;
   level: Level;
   title: string;
-  content: string;
+  content: string; // Keep for compatibility/fallback
+  instructions?: string; // Consigne
+  supportText?: string; // Texte de base / Support
+  questionText?: string; // Question spécifique
+  trialNumber?: string; // N° de l'épreuve
+  audioUrl?: string; // Specific field for listening
+  correctAnswer?: string; // Corrigé type / Sample answer
+  difficultyLevel?: string; // Niveau de difficulté (B1, C1, etc)
+  estimatedTime?: number; // Temps estimé en minutes
+  gradingRubric?: string; // Grille de correction
+  keywordsForAI?: string[]; // Mots-clés pour l'IA
   isPremium: boolean;
   isFullAccessOnly: boolean;
   requiredCredits: number;
   options?: MCQOption[];
-  correctAnswer?: string;
   methodologyContent?: string;
   sourceFile?: string; // Track original file name
   createdAt: string;

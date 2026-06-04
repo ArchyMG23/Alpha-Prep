@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { useAppContext } from '../context/AppContext';
-import { Target, TrendingUp, Award, Clock, ArrowRight, PenTool, Globe, ShieldCheck, BarChart3, LineChart as LineChartIcon } from 'lucide-react';
+import { Attempt } from '../types';
+import { Target, TrendingUp, Award, Clock, ArrowRight, PenTool, Globe, ShieldCheck, BarChart3, LineChart as LineChartIcon, X, Download } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -15,6 +17,7 @@ import {
 
 export default function Dashboard({ navigateTo }: { navigateTo: (tab: string) => void }) {
   const { user, attempts } = useAppContext();
+  const [selectedAttempt, setSelectedAttempt] = useState<Attempt | null>(null);
 
   const chartData = useMemo(() => {
     if (!attempts || attempts.length === 0) return [];
@@ -41,8 +44,109 @@ export default function Dashboard({ navigateTo }: { navigateTo: (tab: string) =>
     return 'Débutant';
   };
 
+  const exportHistoricalToPDF = (attempt: Attempt) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text(`Rapport de Correction - Historique`, 20, 20);
+      
+      const sessionDate = new Date(attempt.date).toLocaleDateString('fr-FR');
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text(`Date de session: ${sessionDate}`, 20, 30);
+      
+      if (attempt.userAnswer) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0);
+        doc.text("Votre Texte:", 20, 45);
+        doc.setFont("helvetica", "normal");
+        const splitText = doc.splitTextToSize(attempt.userAnswer, 170);
+        doc.text(splitText, 20, 55);
+        
+        const yOffset = 55 + (splitText.length * 7) + 10;
+        
+        doc.setFont("helvetica", "bold");
+        doc.text(`Niveau Estimé: NCLC ${attempt.scoreCLB}`, 20, yOffset);
+        
+        doc.text("Feedback:", 20, yOffset + 15);
+        doc.setFont("helvetica", "normal");
+        const splitFeedback = doc.splitTextToSize(attempt.feedback, 170);
+        doc.text(splitFeedback, 20, yOffset + 25);
+      } else {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0);
+        doc.text(`Score QCM: NCLC ${attempt.scoreCLB}`, 20, 45);
+        doc.setFont("helvetica", "normal");
+        const splitFeedback = doc.splitTextToSize(attempt.feedback, 170);
+        doc.text(splitFeedback, 20, 60);
+      }
+      
+      doc.save(`historique_${Date.now()}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'export PDF");
+    }
+  };
+
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 pb-20">
+    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 pb-20 relative">
+
+      {selectedAttempt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative animate-in zoom-in-95">
+            <button 
+              onClick={() => setSelectedAttempt(null)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-800 transition-colors"
+            >
+              <X size={24} />
+            </button>
+            
+            <h2 className="text-2xl font-black text-slate-900 mb-6">Détail de la session</h2>
+            
+            <div className="flex gap-4 items-center mb-6">
+               <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm">
+                 NCLC {selectedAttempt.scoreCLB}
+               </span>
+               <span className="text-sm font-medium text-slate-500">
+                 {new Date(selectedAttempt.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+               </span>
+            </div>
+
+            {selectedAttempt.userAnswer && (
+              <div className="mb-6">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Votre Réponse</h3>
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-700 text-sm italic whitespace-pre-wrap">
+                  {selectedAttempt.userAnswer}
+                </div>
+              </div>
+            )}
+
+            <div className="mb-8">
+              <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-2">Feedback Examinateur / IA</h3>
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-900 text-sm font-medium whitespace-pre-wrap">
+                {selectedAttempt.feedback}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => exportHistoricalToPDF(selectedAttempt)}
+                className="px-6 py-3 bg-indigo-100 text-indigo-700 font-bold rounded-xl hover:bg-indigo-200 transition-colors flex items-center gap-2"
+              >
+                <Download size={18} /> Télécharger PDF
+              </button>
+              <button 
+                onClick={() => setSelectedAttempt(null)}
+                className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter">Tableau de <span className="text-indigo-600">Bord</span></h1>
@@ -232,7 +336,8 @@ export default function Dashboard({ navigateTo }: { navigateTo: (tab: string) =>
               attempts.map((attempt, idx) => (
                 <div 
                   key={attempt.id} 
-                  className="p-5 rounded-[30px] bg-slate-50/50 border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group flex items-center justify-between"
+                  onClick={() => setSelectedAttempt(attempt)}
+                  className="cursor-pointer p-5 rounded-[30px] bg-slate-50/50 border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group flex items-center justify-between"
                   style={{ animationDelay: `${idx * 100}ms` }}
                 >
                   <div className="flex items-center gap-4">

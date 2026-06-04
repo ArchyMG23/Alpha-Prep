@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Question, TaskType, Level, TestType, PlanPrice, Simulation } from '../types';
 import { Plus, Edit2, Trash2, X, Upload, FileText, Music, Video, Loader2, Key, Settings, Lock, ShieldCheck, Save, MessageSquare, CheckCircle2, GraduationCap, List, ArrowRight, Sparkles, Headphones, PenTool, BookOpen } from 'lucide-react';
-import { parseExamDocument } from '../services/geminiService';
+import { parseExamDocument, gradeWritingTask } from '../services/geminiService';
 
 export default function AdminCMS() {
   const { 
@@ -30,10 +30,170 @@ export default function AdminCMS() {
     level: 'B2',
     title: '',
     content: '',
+    instructions: '',
+    supportText: '',
+    questionText: '',
+    trialNumber: '',
+    audioUrl: '',
+    correctAnswer: '',
+    difficultyLevel: 'B2',
+    estimatedTime: 20,
+    gradingRubric: '',
+    keywordsForAI: [],
     isPremium: false,
     isFullAccessOnly: false,
     requiredCredits: 1
   });
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSimGenerating, setIsSimGenerating] = useState(false);
+
+  const handleGenerateFullSimulation = async () => {
+    if (!newSim.title) return alert("Donnez un titre à la simulation avant de générer.");
+    setIsSimGenerating(true);
+    try {
+      const prompt = `Génère une simulation complète d'examen ${newSim.testType} pour le niveau ${newSim.level}.
+      Titre: ${newSim.title}
+      
+      Structure attendue: 3 tâches d'Expression Écrite (Task 1, 2, 3) respectant scrupuleusement la structure officielle TCF Canada/TEF.
+      
+      OUTPUT FORMAT (JSON ARRAY):
+      [
+        {
+          "title": "Tâche 1: ...",
+          "type": "WRITING",
+          "instructions": "...",
+          "supportText": "...",
+          "questionText": "...",
+          "correctAnswer": "...",
+          "gradingRubric": "...",
+          "difficultyLevel": "${newSim.level}",
+          "estimatedTime": 15,
+          "keywordsForAI": ["..."]
+        },
+        ... (2 autres tâches)
+      ]`;
+
+      const aiResponse = await gradeWritingTask(prompt, "CONTEXTE_GENERATION_SIMULATION_COMPLETE", newSim.testType as any);
+      const jsonMatch = aiResponse.feedback.match(/\[[\s\S]*\]/);
+      const generatedQuestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+
+      if (generatedQuestions.length > 0) {
+        const savedQs = [];
+        for (const qData of generatedQuestions) {
+          const newQ: Question = {
+            ...qData,
+            id: `q_simgen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            testType: newSim.testType as any,
+            level: newSim.level as any,
+            isPremium: true,
+            isFullAccessOnly: false,
+            requiredCredits: 1,
+            createdAt: new Date().toISOString()
+          };
+          await saveQuestion(newQ);
+          savedQs.push(newQ);
+        }
+        setNewSim(prev => ({
+          ...prev,
+          questions: [...(prev.questions || []), ...savedQs]
+        }));
+        setSuccessMsg("Simulation complète générée avec succès !");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de la génération de la simulation.");
+    } finally {
+      setIsSimGenerating(false);
+    }
+  };
+
+  const handleGenerateAI = async () => {
+    setIsGenerating(true);
+    try {
+      let structureInstructions = '';
+      if (newQ.testType === 'TCF') {
+        if (newQ.type === 'WRITING') {
+          structureInstructions = `
+          IMPORTANT - STRUCTURE TCF CANADA (Expression Écrite):
+          L'épreuve comprend 3 tâches obligatoires:
+          - Tâche 1 (Message court - 60 à 120 mots): Décrire, raconter, expliquer à un destinataire précisé.
+          - Tâche 2 (Récit/Compte-rendu - 120 à 150 mots): Rendre compte d'une expérience, d'une lecture, d'un voyage.
+          - Tâche 3 (Opinion/Argumentation - 120 à 180 mots): Exprimer un point de vue et l'argumenter de façon logique.
+          Génère UNE de ces tâches (précise laquelle dans le titre).`;
+        } else if (newQ.type === 'SPEAKING') {
+          structureInstructions = `
+          IMPORTANT - STRUCTURE TCF CANADA (Expression Orale):
+          - Task 1: Entretien dirigé sans préparation (2 mins).
+          - Task 2: Exercice en interaction / Simulation de situation (roleplay) (5 mins).
+          - Task 3: Expression d'un point de vue sans préparation (4 mins).
+          Génère UNE de ces tâches.`;
+        }
+      } else if (newQ.testType === 'TEF') {
+        if (newQ.type === 'WRITING') {
+          structureInstructions = `
+          IMPORTANT - STRUCTURE TEF CANADA (Expression Écrite):
+          - Section A: Fait divers à compléter (min 80 mots).
+          - Section B: Argumentation / Lettre au courrier des lecteurs (min 200 mots).`;
+        }
+      }
+
+      const prompt = `Génère un exercice complet de type ${newQ.testType} - ${newQ.type} pour le niveau ${newQ.level}.
+      ${structureInstructions}
+      Thèmes suggérés: Travail, immigration, vie quotidienne, technologie, société, environnement.
+      
+      CRITÈRES D'ÉVALUATION (à inclure dans gradingRubric):
+      - Respect de la consigne et situation de communication
+      - Cohérence et cohésion (connecteurs logiques)
+      - Étendue du lexique et précision
+      - Maîtrise de la grammaire et orthographe
+      
+      OUTPUT FORMAT (JSON):
+      {
+        "title": "Titre réaliste (ex: Epreuve 1 - Tâche 2 - TCF Canada)",
+        "instructions": "Consignes détaillées d'examen",
+        "supportText": "Texte de base ou scénario détaillé",
+        "questionText": "La question finale",
+        "correctAnswer": "Exemple de réponse parfaite (Sample answer)",
+        "gradingRubric": "Grille de correction détaillée basée sur les critères officiels",
+        "difficultyLevel": "${newQ.level}",
+        "estimatedTime": 20,
+        "keywordsForAI": ["mot1", "mot2", "mot3"]
+      }`;
+      
+      const aiResponse = await gradeWritingTask(prompt, "CONTEXTE_GENERATION_EXAMEN", newQ.testType as any);
+      
+      // Attempt to parse the JSON from the feedback (Gemini might wrap it in text)
+      let data;
+      try {
+        const jsonMatch = aiResponse.feedback.match(/\{[\s\S]*\}/);
+        data = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+      } catch (e) {
+        console.error("JSON Parse Error", e);
+      }
+
+      if (data) {
+        setNewQ(prev => ({
+          ...prev,
+          ...data,
+          content: data.questionText || data.supportText // fallback
+        }));
+        setSuccessMsg('Exercice généré par IA avec succès !');
+      } else {
+        // Fallback injection if parse fails but we have text
+        setNewQ(prev => ({
+          ...prev,
+          title: `Sujet ${prev.testType} automatique`,
+          instructions: aiResponse.feedback.slice(0, 500)
+        }));
+        alert("L'IA a répondu mais le format JSON était invalide. Vérifiez les champs.");
+      }
+    } catch (e) {
+      alert("Erreur lors de la génération IA");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const [newSim, setNewSim] = useState<Partial<Simulation>>({
     testType: 'TCF',
@@ -53,6 +213,16 @@ export default function AdminCMS() {
         level: 'B2',
         title: '',
         content: '',
+        instructions: '',
+        supportText: '',
+        questionText: '',
+        trialNumber: '',
+        audioUrl: '',
+        correctAnswer: '',
+        difficultyLevel: 'B2',
+        estimatedTime: 20,
+        gradingRubric: '',
+        keywordsForAI: [],
         isPremium: false,
         isFullAccessOnly: false,
         requiredCredits: 1
@@ -76,34 +246,90 @@ export default function AdminCMS() {
     if (adminCode === '2026' || user?.role === 'ADMIN') {
       setIsAuthorized(true);
       setAdminCode('');
+      try {
+        localStorage.setItem('alpha_admin_override', 'true');
+      } catch (e) {}
     } else {
       alert('Code Admin Incorrect');
     }
   };
 
   const handleSaveQuestion = async () => {
-    if (!newQ.title || !newQ.content) return alert('Veuillez remplir le titre et le contenu.');
-    
-    const question: Question = {
+    // ... validation handling
+    if (!newQ.title || (!newQ.content && !newQ.instructions)) return alert('Veuillez remplir le titre et au moins les consignes.');
+
+    const question: any = {
       id: editingId || `q_${Date.now()}`,
       testType: newQ.testType as TestType,
       type: newQ.type as TaskType,
       level: newQ.level as Level,
       title: newQ.title,
-      content: newQ.content,
-      options: newQ.options,
+      content: newQ.content || '',
+      instructions: newQ.instructions || '',
+      supportText: newQ.supportText || '',
+      questionText: newQ.questionText || '',
+      trialNumber: newQ.trialNumber || '',
+      audioUrl: newQ.audioUrl || '',
+      correctAnswer: newQ.correctAnswer || '',
+      difficultyLevel: newQ.difficultyLevel || '',
+      estimatedTime: newQ.estimatedTime || 15,
+      gradingRubric: newQ.gradingRubric || '',
+      keywordsForAI: newQ.keywordsForAI || [],
       isPremium: newQ.isPremium || false,
       isFullAccessOnly: newQ.isFullAccessOnly || false,
       requiredCredits: newQ.requiredCredits || 0,
-      sourceFile: newQ.sourceFile,
       createdAt: newQ.createdAt || new Date().toISOString()
     };
 
-    await saveQuestion(question);
+    if (newQ.options) question.options = newQ.options;
+    if (newQ.sourceFile) question.sourceFile = newQ.sourceFile;
+    if (newQ.correctAnswer) question.correctAnswer = newQ.correctAnswer;
+    if (newQ.methodologyContent) question.methodologyContent = newQ.methodologyContent;
+
+    await saveQuestion(question as Question);
     setIsAdding(false);
     setEditingId(null);
     setSuccessMsg(editingId ? 'Question mise à jour !' : 'Nouvelle question créée !');
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const fileData = e.target?.result as string;
+        try {
+          const generatedQs = await parseExamDocument(fileData, file.type, file.name);
+          if (generatedQs && generatedQs.length > 0) {
+            const firstQ = generatedQs[0];
+            setNewQ(prev => ({
+              ...prev,
+              ...firstQ,
+              testType: firstQ.testType || prev.testType,
+              type: firstQ.type || prev.type,
+              level: firstQ.level || prev.level
+            }));
+            setSuccessMsg('Document analysé avec succès !');
+          } else {
+            alert("Aucune question n'a été trouvée dans ce document.");
+          }
+        } catch (error) {
+          console.error("Gemini Parsing Error:", error);
+          alert('Erreur lors de l\'analyse du document par l\'IA.');
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(error);
+      setIsUploading(false);
+      alert('Erreur de lecture du fichier.');
+    }
   };
 
   const handleSaveSimulation = async () => {
@@ -130,7 +356,19 @@ export default function AdminCMS() {
   };
 
   const handleEditQuestion = (q: Question) => {
-    setNewQ({ ...q });
+    setNewQ({ 
+      ...q,
+      instructions: q.instructions || '',
+      supportText: q.supportText || '',
+      questionText: q.questionText || '',
+      trialNumber: q.trialNumber || '',
+      audioUrl: q.audioUrl || '',
+      correctAnswer: q.correctAnswer || '',
+      difficultyLevel: q.difficultyLevel || q.level,
+      estimatedTime: q.estimatedTime || 15,
+      gradingRubric: q.gradingRubric || '',
+      keywordsForAI: q.keywordsForAI || []
+    });
     setEditingId(q.id);
     setIsAdding(true);
     setActiveTab('QUESTIONS');
@@ -316,7 +554,30 @@ export default function AdminCMS() {
               {activeTab === 'QUESTIONS' ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                   <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-4 bg-indigo-50 border border-indigo-200 p-6 rounded-3xl">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                        <Sparkles size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-black text-slate-900 text-sm mb-1 line-clamp-1">Génération par IA (Gemini)</h3>
+                        <p className="text-xs font-medium text-slate-500">Uploadez un PDF ou un texte, l'IA extraira l'exercice automatiquement.</p>
+                      </div>
+                      <label className="cursor-pointer">
+                        <div className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-black text-xs uppercase tracking-widest cursor-pointer shadow-lg shadow-indigo-200">
+                          {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                          {isUploading ? 'Analyse...' : 'Importer'}
+                        </div>
+                        <input 
+                          type="file" 
+                          accept="application/pdf, text/plain, image/png, image/jpeg" 
+                          onChange={handleFileUpload} 
+                          className="hidden" 
+                          disabled={isUploading}
+                        />
+                      </label>
+                    </div>
+                    
+                    <div className="grid grid-cols-4 gap-4">
                       <select 
                         value={newQ.testType} 
                         onChange={(e) => setNewQ({...newQ, testType: e.target.value as any})}
@@ -335,20 +596,105 @@ export default function AdminCMS() {
                         <option value="READING">Reading</option>
                         <option value="WRITING">Writing</option>
                       </select>
+                      <input 
+                        type="text" 
+                        value={newQ.trialNumber || ''} 
+                        onChange={(e) => setNewQ({...newQ, trialNumber: e.target.value})}
+                        placeholder="N° Épreuve"
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
+                      />
+                      <button 
+                        onClick={handleGenerateAI}
+                        disabled={isGenerating}
+                        className="w-full bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:bg-slate-300"
+                      >
+                        {isGenerating ? <Loader2 className="animate-spin" size={14} /> : <><Sparkles size={14} /> IA</>}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input 
+                        type="text" 
+                        value={newQ.difficultyLevel || ''} 
+                        onChange={(e) => setNewQ({...newQ, difficultyLevel: e.target.value})}
+                        placeholder="Difficulté (ex: B2 / Band 6.5)"
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
+                      />
+                      <input 
+                        type="number" 
+                        value={newQ.estimatedTime || 0} 
+                        onChange={(e) => setNewQ({...newQ, estimatedTime: parseInt(e.target.value) || 0})}
+                        placeholder="Temps (min)"
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
+                      />
                     </div>
                     <input 
                       type="text" 
-                      value={newQ.title} 
+                      value={newQ.title || ''} 
                       onChange={(e) => setNewQ({...newQ, title: e.target.value})}
                       placeholder="Titre de l'exercice"
                       className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl font-bold text-lg outline-none"
                     />
-                    <textarea 
-                      value={newQ.content} 
-                      onChange={(e) => setNewQ({...newQ, content: e.target.value})}
-                      placeholder="Corps de l'exercice / Sujet..."
-                      className="w-full h-64 p-5 bg-slate-50 border border-slate-200 rounded-3xl font-medium text-sm outline-none resize-none"
-                    />
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 border-l-2 border-indigo-600 pl-2 uppercase tracking-widest block">Consignes (Instructions)</label>
+                      <textarea 
+                        value={newQ.instructions || ''} 
+                        onChange={(e) => setNewQ({...newQ, instructions: e.target.value})}
+                        placeholder="Ex: Rédigez un court message..."
+                        className="w-full h-32 p-5 bg-slate-50 border border-slate-200 rounded-3xl font-medium text-sm outline-none resize-none"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 border-l-2 border-emerald-600 pl-2 uppercase tracking-widest block">Texte de base / Support</label>
+                      <textarea 
+                        value={newQ.supportText || ''} 
+                        onChange={(e) => setNewQ({...newQ, supportText: e.target.value})}
+                        placeholder="Texte à analyser ou support visuel (optionnel)..."
+                        className="w-full h-48 p-5 bg-slate-50 border border-slate-200 rounded-3xl font-medium text-sm outline-none resize-none"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 border-l-2 border-amber-600 pl-2 uppercase tracking-widest block">Question Spécifique / Champ Calculé</label>
+                      <textarea 
+                        value={newQ.questionText || newQ.content || ''} 
+                        onChange={(e) => setNewQ({...newQ, questionText: e.target.value, content: e.target.value})}
+                        placeholder="La question finale posée à l'utilisateur..."
+                        className="w-full h-24 p-5 bg-slate-50 border border-slate-200 rounded-3xl font-medium text-sm outline-none resize-none"
+                      />
+                    </div>
+                    
+                    {(newQ.type === 'LISTENING' || newQ.testType === 'IELTS') && (
+                      <div className="space-y-4">
+                        <label className="text-[10px] font-black text-indigo-400 border-l-2 border-indigo-600 pl-2 uppercase tracking-widest block">URL de l'audio</label>
+                        <input 
+                          type="text" 
+                          value={newQ.audioUrl || ''} 
+                          onChange={(e) => setNewQ({...newQ, audioUrl: e.target.value})}
+                          placeholder="Collez ici le lien vers le fichier audio..."
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 border-l-2 border-slate-600 pl-2 uppercase tracking-widest block">Critères / Grille de correction</label>
+                      <textarea 
+                        value={newQ.gradingRubric || ''} 
+                        onChange={(e) => setNewQ({...newQ, gradingRubric: e.target.value})}
+                        placeholder="Points de passage, rubriques d'évaluation..."
+                        className="w-full h-32 p-5 bg-slate-50 border border-slate-200 rounded-3xl font-medium text-sm outline-none resize-none"
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-rose-400 border-l-2 border-rose-600 pl-2 uppercase tracking-widest block">Mots-clés Correction IA (séparés par virgule)</label>
+                      <input 
+                        type="text" 
+                        value={newQ.keywordsForAI?.join(', ') || ''} 
+                        onChange={(e) => setNewQ({...newQ, keywordsForAI: e.target.value.split(',').map(s => s.trim())})}
+                        placeholder="argumentation, subjonctif, passé composé..."
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold outline-none"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-6">
                     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-4">
@@ -398,23 +744,32 @@ export default function AdminCMS() {
                     </div>
                     <input 
                       type="text" 
-                      value={newSim.title} 
+                      value={newSim.title || ''} 
                       onChange={(e) => setNewSim({...newSim, title: e.target.value})}
                       placeholder="Titre de la simulation"
                       className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl font-black text-2xl outline-none shadow-inner"
                     />
                     <textarea 
-                       value={newSim.description} 
+                       value={newSim.description || ''} 
                        onChange={(e) => setNewSim({...newSim, description: e.target.value})}
                        placeholder="Longue description marketing..."
                        className="w-full h-32 p-5 bg-slate-50 border border-slate-200 rounded-3xl font-medium text-sm outline-none resize-none"
                     />
-                    <button 
-                      onClick={handleSaveSimulation}
-                      className="w-full py-6 bg-indigo-600 text-white font-black rounded-[32px] hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-200 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
-                    >
-                      <Save size={24} /> Publier la simulation
-                    </button>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={handleSaveSimulation}
+                        className="flex-1 py-6 bg-slate-900 text-white font-black rounded-[32px] hover:bg-slate-800 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
+                      >
+                        <Save size={24} /> Publier
+                      </button>
+                      <button 
+                        onClick={handleGenerateFullSimulation}
+                        disabled={isSimGenerating}
+                        className="flex-1 py-6 bg-indigo-600 text-white font-black rounded-[32px] hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-200 flex items-center justify-center gap-3 uppercase tracking-widest text-sm disabled:bg-slate-300"
+                      >
+                        {isSimGenerating ? <Loader2 className="animate-spin" /> : <><Sparkles size={24} /> Simulation IA</>}
+                      </button>
+                    </div>
                   </div>
                   <div className="bg-slate-50 p-8 rounded-[48px] border border-slate-200 flex flex-col h-[600px] shadow-inner">
                     <h3 className="text-xl font-black text-slate-900 mb-2 mt-2 tracking-tighter">Épreuves rattachées</h3>

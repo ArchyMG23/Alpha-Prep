@@ -65,23 +65,33 @@ export default function Layout({ children, activeTab, setActiveTab }: { children
               animate={{ opacity: 1, y: 0 }}
               className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-3xl max-w-sm"
             >
-              <h4 className="text-amber-900 font-black text-xs uppercase tracking-widest mb-2">Problème de connexion détecté</h4>
+              <h4 className="text-amber-900 font-black text-xs uppercase tracking-widest mb-2">Blocage Réseau Détecté</h4>
               <p className="text-amber-800 text-[10px] font-bold leading-relaxed space-y-2">
-                <span>Le chargement est anormalement lent. Cela arrive souvent sur les réseaux Orange/MTN au Cameroun.</span>
+                <span>L'accès à l'application est actuellement restreint par votre opérateur (Orange/MTN). C'est un problème connu indépendant de l'application.</span>
                 <br /><br />
-                <strong>Solutions suggérées :</strong>
+                <strong>Solutions pour débloquer :</strong>
                 <ul className="list-disc ml-4 mt-1">
-                  <li>Activez/Désactivez le mode Avion</li>
-                  <li>Utilisez un DNS public (8.8.8.8)</li>
-                  <li>Essayez via un VPN si possible</li>
+                  <li><strong>Activez un VPN</strong> (ex: Windscribe, ProtonVPN)</li>
+                  <li><strong>Changez vos DNS</strong> vers ceux de Google (8.8.8.8)</li>
+                  <li>Essayez en <strong>Wifi filaire</strong> si possible</li>
                 </ul>
               </p>
-              <button 
-                onClick={() => window.location.reload()}
-                className="mt-4 w-full px-6 py-3 bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-amber-300 transition-colors"
-              >
-                Réessayer la connexion
-              </button>
+              <div className="flex gap-2 mt-4">
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="flex-1 px-4 py-3 bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-amber-300 transition-colors"
+                >
+                  Réessayer
+                </button>
+                <a 
+                  href="https://1.1.1.1" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-colors flex items-center justify-center"
+                >
+                  Solution DNS
+                </a>
+              </div>
             </motion.div>
           )}
         </div>
